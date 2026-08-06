@@ -117,7 +117,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
           <Save className="w-4 h-4 text-emerald-400" />
         </button>
 
-        {/* Supabase & Actualiser Buttons (SuperAdmin Only) */}
+        {/* Supabase Button (SuperAdmin Only) */}
         {currentUser.role === 'super-admin' && (
           <div className="flex items-center gap-1.5">
             <button
@@ -132,24 +132,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
               <Database className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Supabase DB</span>
               <span className={`w-2 h-2 rounded-full ${isSupabaseConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
-            </button>
-
-            <button
-              onClick={async () => {
-                const ok = await syncFromSupabase();
-                if (ok) {
-                  addNotification({
-                    type: 'success',
-                    title: 'Actualisation',
-                    message: 'Les données ont été synchronisées avec la base de données.'
-                  });
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm border bg-slate-800/60 hover:bg-slate-800 border-white/15 text-slate-200"
-              title="Actualiser et synchroniser les données BDD"
-            >
-              <Database className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="hidden sm:inline">Actualiser</span>
             </button>
           </div>
         )}
