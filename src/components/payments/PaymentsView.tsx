@@ -1,0 +1,161 @@
+import React, { useState } from 'react';
+import { useApp } from '../../context/AppContext';
+import { MediaPayment } from '../../types';
+import {
+  CreditCard,
+  Plus,
+  Trash2,
+  Tv,
+  Calendar,
+  Building2,
+  Phone,
+  User,
+  DollarSign,
+  FileCheck,
+  Tag
+} from 'lucide-react';
+
+interface PaymentsViewProps {
+  onOpenAddModal: () => void;
+}
+
+export const PaymentsView: React.FC<PaymentsViewProps> = ({ onOpenAddModal }) => {
+  const { mediaPayments, deleteMediaPayment, globalSearchQuery } = useApp();
+
+  const filteredPayments = mediaPayments.filter((p) => {
+    if (globalSearchQuery.trim()) {
+      const q = globalSearchQuery.toLowerCase();
+      const matchMedia = p.mediaName?.toLowerCase().includes(q);
+      const matchEvent = p.eventName?.toLowerCase().includes(q);
+      const matchClient = p.clientName?.toLowerCase().includes(q);
+      const matchRef = p.referenceNo?.toLowerCase().includes(q);
+      const matchFocal = p.focalPointName?.toLowerCase().includes(q);
+      if (!matchMedia && !matchEvent && !matchClient && !matchRef && !matchFocal) return false;
+    }
+    return true;
+  });
+
+  const totalPaymentsSum = filteredPayments.reduce((s, p) => s + p.amount, 0);
+
+  return (
+    <div className="space-y-6 animate-fade-in pb-12">
+      {/* Header Banner */}
+      <div className="p-6 rounded-3xl bg-slate-900/60 border border-white/15 backdrop-blur-2xl shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-cyan-400 uppercase tracking-widest mb-1">
+            <CreditCard className="w-4 h-4" />
+            <span>Table Mère Media_payments</span>
+          </div>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">Registre des Paiements Médias</h1>
+          <p className="text-xs text-slate-300 mt-1 max-w-xl">
+            Historique des débursements, acomptes et règlements effectués aux médias et points focaux.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-4 shrink-0">
+          <div className="px-4 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-right">
+            <div className="text-[10px] text-slate-400 font-medium">Total Décaissements</div>
+            <div className="text-xl font-bold font-mono text-emerald-400">
+              ${totalPaymentsSum.toLocaleString('fr-FR')}
+            </div>
+          </div>
+
+          <button
+            onClick={onOpenAddModal}
+            className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold rounded-2xl text-xs transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/25"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Enregistrer un Paiement</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Table */}
+      <div className="rounded-3xl bg-slate-900/60 border border-white/15 backdrop-blur-2xl shadow-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-white/5 border-b border-white/10 text-[11px] font-bold uppercase tracking-wider text-emerald-300 select-none">
+                <th className="py-3.5 px-4">Date / Référence</th>
+                <th className="py-3.5 px-4">Média / Point Focal</th>
+                <th className="py-3.5 px-4">Événement</th>
+                <th className="py-3.5 px-4">Client</th>
+                <th className="py-3.5 px-4">Mode de Règlement</th>
+                <th className="py-3.5 px-4 text-right">Montant Versé ($)</th>
+                <th className="py-3.5 px-4 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5 text-xs">
+              {filteredPayments.map((pay) => (
+                <tr key={pay.id} className="hover:bg-emerald-500/10 transition-colors group">
+                  {/* Date & Ref */}
+                  <td className="py-3 px-4">
+                    <div className="font-bold text-white font-mono">{pay.paymentDate}</div>
+                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">{pay.referenceNo}</div>
+                  </td>
+
+                  {/* Media & Focal Point */}
+                  <td className="py-3 px-4">
+                    <div className="font-semibold text-slate-100 flex items-center gap-1.5">
+                      <Tv className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>{pay.mediaName}</span>
+                    </div>
+                    {pay.focalPointName && (
+                      <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+                        <User className="w-2.5 h-2.5 text-emerald-400" />
+                        <span>Point focal: {pay.focalPointName}</span>
+                      </div>
+                    )}
+                  </td>
+
+                  {/* Event */}
+                  <td className="py-3 px-4 font-medium text-slate-200">
+                    {pay.eventName}
+                  </td>
+
+                  {/* Client */}
+                  <td className="py-3 px-4">
+                    <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[11px] text-slate-300">
+                      {pay.clientName}
+                    </span>
+                  </td>
+
+                  {/* Mode */}
+                  <td className="py-3 px-4">
+                    <span className="px-2.5 py-1 rounded-xl text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      {pay.paymentMethod}
+                    </span>
+                  </td>
+
+                  {/* Amount */}
+                  <td className="py-3 px-4 text-right font-mono font-bold text-emerald-400 text-sm">
+                    ${pay.amount.toLocaleString('fr-FR')}
+                  </td>
+
+                  {/* Actions */}
+                  <td className="py-3 px-4 text-center">
+                    <button
+                      onClick={() => deleteMediaPayment(pay.id)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 transition-all"
+                      title="Annuler/Supprimer ce paiement"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+
+              {filteredPayments.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400 text-sm">
+                    Aucun paiement enregistré dans le registre.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};

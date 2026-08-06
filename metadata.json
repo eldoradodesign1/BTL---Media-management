@@ -1,0 +1,6 @@
+{
+  "name": "Media Campaign Manager",
+  "description": "Plateforme moderne de gestion des campagnes médias, événements, tarifications, diffusions et budgets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
