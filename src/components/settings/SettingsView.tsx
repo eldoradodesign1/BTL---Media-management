@@ -61,7 +61,15 @@ ALTER TABLE pricing ADD CONSTRAINT unique_media_client_rate_type UNIQUE(media_id
 ALTER TABLE medias ADD COLUMN IF NOT EXISTS default_focal_point_id VARCHAR(100);
 CREATE TABLE IF NOT EXISTS events (id VARCHAR(100) PRIMARY KEY, event_date DATE NOT NULL, name VARCHAR(200) NOT NULL, client_id VARCHAR(100) NOT NULL, region_id VARCHAR(100) NOT NULL, status VARCHAR(50) DEFAULT 'Planifié', notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS media_events (id VARCHAR(100) PRIMARY KEY, event_id VARCHAR(100) NOT NULL, media_id VARCHAR(100) NOT NULL, proof_of_diffusion TEXT, expense_type VARCHAR(50), updated_at TIMESTAMPTZ DEFAULT NOW());
-CREATE TABLE IF NOT EXISTS media_payments (id VARCHAR(100) PRIMARY KEY, payment_date DATE NOT NULL DEFAULT CURRENT_DATE, media_id VARCHAR(100) NOT NULL, event_id VARCHAR(100) NOT NULL, client_id VARCHAR(100), focal_point_id VARCHAR(100), amount NUMERIC(12, 2) NOT NULL, payment_method VARCHAR(50) NOT NULL, reference_no VARCHAR(100), notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS payment_categories (id VARCHAR(100) PRIMARY KEY, code VARCHAR(50) UNIQUE NOT NULL, label VARCHAR(100) NOT NULL, description TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
+INSERT INTO payment_categories (id, code, label, description) VALUES
+  ('cat-vir', 'Virement', 'Virement Bancaire', 'Transfert direct compte à compte'),
+  ('cat-mm', 'Mobile Money', 'Mobile Money', 'M-Pesa, Airtel Money, Orange Money'),
+  ('cat-chk', 'Chèque', 'Chèque Bancaire', 'Paiement par chèque certifié ou classique'),
+  ('cat-esp', 'Espèces', 'Espèces (Caisse)', 'Règlement direct en liquide / caisse')
+ON CONFLICT (code) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS media_payments (id VARCHAR(100) PRIMARY KEY, payment_date DATE NOT NULL DEFAULT CURRENT_DATE, media_id VARCHAR(100) NOT NULL, event_id VARCHAR(100) NOT NULL, client_id VARCHAR(100), focal_point_id VARCHAR(100), amount NUMERIC(12, 2) NOT NULL, payment_method VARCHAR(50) NOT NULL DEFAULT 'Virement', reference_no VARCHAR(100), notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS purchase_orders (id VARCHAR(100) PRIMARY KEY, po_number VARCHAR(100) NOT NULL, client_id VARCHAR(100) NOT NULL, amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00, support_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00, fpc_percent NUMERIC(5, 2) NOT NULL DEFAULT 5.00, agency_fees_percent NUMERIC(5, 2) NOT NULL DEFAULT 14.00, po_date DATE NOT NULL DEFAULT CURRENT_DATE, status VARCHAR(20) DEFAULT 'Actif', notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS audit_logs (id VARCHAR(100) PRIMARY KEY, user_id VARCHAR(100), user_name VARCHAR(150), action VARCHAR(50) NOT NULL, entity_type VARCHAR(50) NOT NULL, entity_id VARCHAR(100), details TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS password_reset_requests (id VARCHAR(100) PRIMARY KEY, email VARCHAR(150) NOT NULL, user_name VARCHAR(150), reason TEXT, status VARCHAR(20) DEFAULT 'En attente', created_at TIMESTAMPTZ DEFAULT NOW());
@@ -77,7 +85,11 @@ ALTER TABLE pricing ENABLE ROW LEVEL SECURITY;
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE media_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE media_payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payment_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public Payment Categories" ON payment_categories;
+CREATE POLICY "Public Payment Categories" ON payment_categories FOR ALL USING (true) WITH CHECK (true);
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Public Roles" ON roles;
