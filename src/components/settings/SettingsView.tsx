@@ -53,11 +53,12 @@ CREATE TABLE IF NOT EXISTS focal_points (id VARCHAR(100) PRIMARY KEY, name VARCH
 CREATE TABLE IF NOT EXISTS medias (id VARCHAR(100) PRIMARY KEY, name VARCHAR(150) NOT NULL, location VARCHAR(100) NOT NULL, type_id VARCHAR(100), transport_fee NUMERIC(12, 2) DEFAULT 0.00, phone VARCHAR(50), default_focal_point_id VARCHAR(100), created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS pricing (id VARCHAR(100) PRIMARY KEY, media_id VARCHAR(100) NOT NULL, client_id VARCHAR(100) NOT NULL, rate_type VARCHAR(20) NOT NULL DEFAULT 'catalog', rate_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00, effective_date DATE DEFAULT CURRENT_DATE, version INT DEFAULT 1, CONSTRAINT unique_media_client_rate_type UNIQUE(media_id, client_id, rate_type));
 
--- Script de migration si la table pricing existe déjà sans rate_type :
+-- Script de migration si les tables existent déjà avec d'anciennes versions :
 ALTER TABLE pricing ADD COLUMN IF NOT EXISTS rate_type VARCHAR(20) NOT NULL DEFAULT 'catalog';
 ALTER TABLE pricing DROP CONSTRAINT IF EXISTS unique_media_client_pricing;
 ALTER TABLE pricing DROP CONSTRAINT IF EXISTS unique_media_client_rate_type;
 ALTER TABLE pricing ADD CONSTRAINT unique_media_client_rate_type UNIQUE(media_id, client_id, rate_type);
+ALTER TABLE medias ADD COLUMN IF NOT EXISTS default_focal_point_id VARCHAR(100);
 CREATE TABLE IF NOT EXISTS events (id VARCHAR(100) PRIMARY KEY, event_date DATE NOT NULL, name VARCHAR(200) NOT NULL, client_id VARCHAR(100) NOT NULL, region_id VARCHAR(100) NOT NULL, status VARCHAR(50) DEFAULT 'Planifié', notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS media_events (id VARCHAR(100) PRIMARY KEY, event_id VARCHAR(100) NOT NULL, media_id VARCHAR(100) NOT NULL, proof_of_diffusion TEXT, expense_type VARCHAR(50), updated_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS media_payments (id VARCHAR(100) PRIMARY KEY, payment_date DATE NOT NULL DEFAULT CURRENT_DATE, media_id VARCHAR(100) NOT NULL, event_id VARCHAR(100) NOT NULL, client_id VARCHAR(100), focal_point_id VARCHAR(100), amount NUMERIC(12, 2) NOT NULL, payment_method VARCHAR(50) NOT NULL, reference_no VARCHAR(100), notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());

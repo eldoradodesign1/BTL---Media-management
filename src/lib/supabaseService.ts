@@ -61,9 +61,25 @@ async function upsertWithFallback(tableName: string, rawPayload: any | any[]) {
     return res;
   };
 
-  const cleanedArray = rawArray.map(sanitizeObj);
+  let cleanedArray = rawArray.map(sanitizeObj);
 
   let { error } = await supabase.from(tableName).upsert(cleanedArray);
+
+  // If missing column error in Supabase schema cache (e.g. Could not find the 'default_focal_point_id' column of 'medias')
+  if (error && error.message.includes('Could not find the') && error.message.includes('column')) {
+    const match = error.message.match(/Could not find the '([^']+)' column/i);
+    if (match && match[1]) {
+      const missingCol = match[1];
+      console.warn(`Supabase ${tableName} is missing column '${missingCol}'. Retrying upsert without it.`);
+      cleanedArray = cleanedArray.map((obj: any) => {
+        const copy = { ...obj };
+        delete copy[missingCol];
+        return copy;
+      });
+      const retry = await supabase.from(tableName).upsert(cleanedArray);
+      error = retry.error;
+    }
+  }
 
   if (error && (error.code === '22P02' || error.message.toLowerCase().includes('uuid'))) {
     const convertObjToUuid = (obj: any): any => {
@@ -83,6 +99,20 @@ async function upsertWithFallback(tableName: string, rawPayload: any | any[]) {
     const uuidArray = cleanedArray.map(convertObjToUuid);
     const retry = await supabase.from(tableName).upsert(uuidArray);
     error = retry.error;
+
+    if (error && error.message.includes('Could not find the') && error.message.includes('column')) {
+      const match = error.message.match(/Could not find the '([^']+)' column/i);
+      if (match && match[1]) {
+        const missingCol = match[1];
+        const strippedUuidArray = uuidArray.map((obj: any) => {
+          const copy = { ...obj };
+          delete copy[missingCol];
+          return copy;
+        });
+        const retry2 = await supabase.from(tableName).upsert(strippedUuidArray);
+        error = retry2.error;
+      }
+    }
   }
 
   if (error) {
