@@ -39,10 +39,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
     setIsSupabaseModalOpen,
     isSupabaseConnected,
     notifications,
+    passwordResetRequests,
+    resolvePasswordResetRequest,
     triggerManualSave,
     setIsProfileModalOpen,
     setIsAuthModalOpen,
     logout,
+    syncFromSupabase,
+    addNotification,
   } = useApp();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -113,39 +117,41 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
           <Save className="w-4 h-4 text-emerald-400" />
         </button>
 
-        {/* Supabase Status & Config Button (SuperAdmin Only) vs Standard Sync Button */}
-        {currentUser.role === 'super-admin' ? (
-          <button
-            onClick={() => setIsSupabaseModalOpen(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm border ${
-              isSupabaseConnected
-                ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/40 text-emerald-300'
-                : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/40 text-amber-300'
-            }`}
-            title="Gérer la connexion Supabase PostgreSQL (SuperAdmin)"
-          >
-            <Database className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Supabase DB</span>
-            <span className={`w-2 h-2 rounded-full ${isSupabaseConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
-          </button>
-        ) : (
-          <button
-            onClick={async () => {
-              const ok = await useApp().syncFromSupabase();
-              if (ok) {
-                useApp().addNotification({
-                  type: 'success',
-                  title: 'Actualisation',
-                  message: 'Les données ont été synchronisées avec la base de données.'
-                });
-              }
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm border bg-slate-800/60 hover:bg-slate-800 border-white/15 text-slate-200"
-            title="Actualiser et synchroniser les données"
-          >
-            <Database className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden sm:inline">Actualiser</span>
-          </button>
+        {/* Supabase & Actualiser Buttons (SuperAdmin Only) */}
+        {currentUser.role === 'super-admin' && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setIsSupabaseModalOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm border ${
+                isSupabaseConnected
+                  ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/40 text-emerald-300'
+                  : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/40 text-amber-300'
+              }`}
+              title="Gérer la connexion Supabase PostgreSQL (SuperAdmin)"
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Supabase DB</span>
+              <span className={`w-2 h-2 rounded-full ${isSupabaseConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+            </button>
+
+            <button
+              onClick={async () => {
+                const ok = await syncFromSupabase();
+                if (ok) {
+                  addNotification({
+                    type: 'success',
+                    title: 'Actualisation',
+                    message: 'Les données ont été synchronisées avec la base de données.'
+                  });
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm border bg-slate-800/60 hover:bg-slate-800 border-white/15 text-slate-200"
+              title="Actualiser et synchroniser les données BDD"
+            >
+              <Database className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">Actualiser</span>
+            </button>
+          </div>
         )}
 
         {/* Export Button */}
@@ -207,31 +213,72 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
             className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 relative transition-all"
           >
             <Bell className="w-4 h-4 text-amber-400" />
-            {notifications.length > 0 && (
+            {(notifications.length > 0 || (['super-admin', 'admin'].includes(currentUser.role) && passwordResetRequests.filter(r => r.status === 'En attente').length > 0)) && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center animate-pulse">
-                {notifications.length}
+                {notifications.length + (['super-admin', 'admin'].includes(currentUser.role) ? passwordResetRequests.filter(r => r.status === 'En attente').length : 0)}
               </span>
             )}
           </button>
 
           {isNotifOpen && (
-            <div className="absolute right-0 mt-2 w-80 bg-slate-900/95 border border-white/20 rounded-2xl shadow-2xl p-3 z-50 text-slate-200 backdrop-blur-2xl">
+            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-slate-900/95 border border-white/20 rounded-2xl shadow-2xl p-3 z-50 text-slate-200 backdrop-blur-2xl">
               <div className="text-xs font-semibold uppercase tracking-wider text-cyan-400 mb-2 px-1 flex items-center justify-between">
-                <span>Notifications système</span>
-                <span className="text-[10px] text-slate-400">{notifications.length} actives</span>
+                <span>Notifications & Demandes</span>
+                <span className="text-[10px] text-slate-400">
+                  {notifications.length + (['super-admin', 'admin'].includes(currentUser.role) ? passwordResetRequests.filter(r => r.status === 'En attente').length : 0)} récentes
+                </span>
               </div>
-              {notifications.length === 0 ? (
-                <div className="text-xs text-slate-400 py-4 text-center">Aucune alerte en attente</div>
-              ) : (
-                <div className="space-y-1.5 max-h-60 overflow-y-auto">
-                  {notifications.map((n) => (
-                    <div key={n.id} className="p-2 rounded-xl bg-white/5 border border-white/10 text-xs">
-                      <div className="font-semibold text-white">{n.title}</div>
-                      <div className="text-slate-300 text-[11px] mt-0.5">{n.message}</div>
+
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {/* Password Reset Requests for Admins */}
+                {['super-admin', 'admin'].includes(currentUser.role) && passwordResetRequests.filter(r => r.status === 'En attente').length > 0 && (
+                  <div className="space-y-1.5 pb-2 border-b border-white/10">
+                    <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider px-1">
+                      🔐 Demandes Réinitialisation Mdp ({passwordResetRequests.filter(r => r.status === 'En attente').length})
                     </div>
-                  ))}
-                </div>
-              )}
+                    {passwordResetRequests.filter(r => r.status === 'En attente').map((req) => (
+                      <div key={req.id} className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-1.5">
+                        <div className="flex items-center justify-between font-bold text-white">
+                          <span>{req.userName || req.email}</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">En attente</span>
+                        </div>
+                        <div className="text-[10px] text-slate-300 font-mono">{req.email}</div>
+                        {req.reason && <div className="text-[11px] text-slate-400 italic">"{req.reason}"</div>}
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            onClick={() => resolvePasswordResetRequest(req.id, 'Résolu')}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[10px] transition-all"
+                          >
+                            Accepter / Marquer Résolu
+                          </button>
+                          <button
+                            onClick={() => resolvePasswordResetRequest(req.id, 'Rejeté')}
+                            className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-semibold text-[10px] border border-rose-500/30 transition-all"
+                          >
+                            Rejeter
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Toast Notifications */}
+                {notifications.length > 0 && (
+                  <div className="space-y-1.5">
+                    {notifications.map((n) => (
+                      <div key={n.id} className="p-2 rounded-xl bg-white/5 border border-white/10 text-xs">
+                        <div className="font-semibold text-white">{n.title}</div>
+                        <div className="text-slate-300 text-[11px] mt-0.5">{n.message}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {notifications.length === 0 && (!['super-admin', 'admin'].includes(currentUser.role) || passwordResetRequests.filter(r => r.status === 'En attente').length === 0) && (
+                  <div className="text-xs text-slate-400 py-6 text-center">Aucune alerte ou demande en attente</div>
+                )}
+              </div>
             </div>
           )}
         </div>

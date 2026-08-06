@@ -185,3 +185,12 @@ export interface PurchaseOrder {
   createdAt: string;
 }
 
+export interface PasswordResetRequest {
+  id: string;
+  email: string;
+  userName?: string;
+  reason?: string;
+  status: 'En attente' | 'Résolu' | 'Rejeté';
+  createdAt: string;
+}
+

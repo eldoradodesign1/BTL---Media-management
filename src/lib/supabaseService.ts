@@ -33,7 +33,7 @@ export function ensureUuid(id: string | null | undefined): string | null {
 
 /**
  * Helper to upsert single or multiple records into Supabase.
- * Tries raw IDs first (for VARCHAR schemas). If Postgres fails with UUID type syntax error (22P02),
+ * Cleans empty string IDs to null first. If Postgres fails with UUID type syntax error (22P02),
  * automatically converts all ID fields to UUIDs and retries.
  */
 async function upsertWithFallback(tableName: string, rawPayload: any | any[]) {
@@ -43,7 +43,27 @@ async function upsertWithFallback(tableName: string, rawPayload: any | any[]) {
   const rawArray = Array.isArray(rawPayload) ? rawPayload : [rawPayload];
   if (rawArray.length === 0) return { error: null };
 
-  let { error } = await supabase.from(tableName).upsert(rawArray);
+  const sanitizeObj = (obj: any): any => {
+    if (!obj || typeof obj !== 'object') return obj;
+    const res: any = {};
+    for (const key of Object.keys(obj)) {
+      const val = obj[key];
+      if (key === 'id' || key.endsWith('_id')) {
+        if (val === null || val === undefined || (typeof val === 'string' && val.trim() === '')) {
+          res[key] = null;
+        } else {
+          res[key] = val;
+        }
+      } else {
+        res[key] = val;
+      }
+    }
+    return res;
+  };
+
+  const cleanedArray = rawArray.map(sanitizeObj);
+
+  let { error } = await supabase.from(tableName).upsert(cleanedArray);
 
   if (error && (error.code === '22P02' || error.message.toLowerCase().includes('uuid'))) {
     const convertObjToUuid = (obj: any): any => {
@@ -60,7 +80,7 @@ async function upsertWithFallback(tableName: string, rawPayload: any | any[]) {
       return res;
     };
 
-    const uuidArray = rawArray.map(convertObjToUuid);
+    const uuidArray = cleanedArray.map(convertObjToUuid);
     const retry = await supabase.from(tableName).upsert(uuidArray);
     error = retry.error;
   }
@@ -312,11 +332,11 @@ export const supabaseService = {
       id: evt.id,
       event_date: evt.eventDate,
       name: evt.name,
-      client_id: evt.clientId,
-      region_id: evt.regionId,
-      status: evt.status,
+      client_id: evt.clientId || null,
+      region_id: evt.regionId || null,
+      status: evt.status || 'Planifié',
       notes: evt.notes || '',
-      created_at: evt.createdAt
+      created_at: evt.createdAt || new Date().toISOString().split('T')[0]
     });
   },
 
@@ -656,6 +676,48 @@ export const supabaseService = {
     } catch (err) {
       console.error('Erreur sauvegarde utilisateur Supabase:', err);
       return false;
+    }
+  },
+
+  // Password Reset Requests Table Sync
+  async savePasswordResetRequest(req: { id: string; email: string; userName?: string; reason?: string; status: string; createdAt: string }) {
+    const supabase = getSupabaseClient();
+    if (!supabase) return false;
+
+    try {
+      await upsertWithFallback('password_reset_requests', {
+        id: req.id,
+        email: req.email,
+        user_name: req.userName || req.email,
+        reason: req.reason || '',
+        status: req.status || 'En attente',
+        created_at: req.createdAt || new Date().toISOString()
+      });
+      return true;
+    } catch (err) {
+      console.error('Erreur sauvegarde demande mot de passe Supabase:', err);
+      return false;
+    }
+  },
+
+  async loadPasswordResetRequests() {
+    const supabase = getSupabaseClient();
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase.from('password_reset_requests').select('*').order('created_at', { ascending: false });
+      if (error || !data) return [];
+      return data.map((item: any) => ({
+        id: item.id,
+        email: item.email,
+        userName: item.user_name || item.email,
+        reason: item.reason || '',
+        status: item.status || 'En attente',
+        createdAt: item.created_at
+      }));
+    } catch (err) {
+      console.error('Erreur chargement demandes mot de passe Supabase:', err);
+      return [];
     }
   }
 };

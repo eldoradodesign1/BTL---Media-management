@@ -17,11 +17,12 @@ import {
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
-  const { activeTab, setActiveTab, events, mediaByEvents, mediaPayments } = useApp();
+  const { activeTab, setActiveTab, events, mediaByEvents, mediaPayments, currentUser } = useApp();
 
   const totalEventsCount = events.length;
   const totalDiffusionsCount = mediaByEvents.length;
   const totalPaymentsCount = mediaPayments.length;
+  const isSuperAdmin = currentUser?.role === 'super-admin';
 
   const navItems = [
     {
@@ -82,10 +83,10 @@ export const Sidebar: React.FC = () => {
     },
     {
       id: 'settings',
-      label: 'Paramètres & BDD SQL',
+      label: isSuperAdmin ? 'Paramètres & BDD SQL' : 'Paramètres & Thèmes',
       icon: Settings,
       badge: null,
-      desc: 'Supabase DDL, thèmes & colonnes',
+      desc: isSuperAdmin ? 'Supabase DDL, thèmes & administration' : 'Thèmes & raccourcis clavier',
     },
   ];
 

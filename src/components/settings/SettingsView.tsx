@@ -13,12 +13,25 @@ import {
   Server,
   ShieldCheck,
   Layers,
-  Code
+  Code,
+  Keyboard,
+  Command
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
-  const { theme, setTheme, resetToDefaultData, addNotification, setIsSupabaseModalOpen, isSupabaseConnected } = useApp();
+  const {
+    theme,
+    setTheme,
+    resetToDefaultData,
+    addNotification,
+    setIsSupabaseModalOpen,
+    isSupabaseConnected,
+    setIsShortcutsModalOpen,
+    currentUser
+  } = useApp();
+
   const [copied, setCopied] = useState(false);
+  const isSuperAdmin = currentUser?.role === 'super-admin';
 
   const sqlSchemaText = `-- =========================================================
 -- MEDIA CAMPAIGN MANAGER - SUPABASE & POSTGRESQL SCHEMA DDL
@@ -50,6 +63,7 @@ CREATE TABLE IF NOT EXISTS media_events (id VARCHAR(100) PRIMARY KEY, event_id V
 CREATE TABLE IF NOT EXISTS media_payments (id VARCHAR(100) PRIMARY KEY, payment_date DATE NOT NULL DEFAULT CURRENT_DATE, media_id VARCHAR(100) NOT NULL, event_id VARCHAR(100) NOT NULL, client_id VARCHAR(100), focal_point_id VARCHAR(100), amount NUMERIC(12, 2) NOT NULL, payment_method VARCHAR(50) NOT NULL, reference_no VARCHAR(100), notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS purchase_orders (id VARCHAR(100) PRIMARY KEY, po_number VARCHAR(100) NOT NULL, client_id VARCHAR(100) NOT NULL, amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00, support_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00, fpc_percent NUMERIC(5, 2) NOT NULL DEFAULT 5.00, agency_fees_percent NUMERIC(5, 2) NOT NULL DEFAULT 14.00, po_date DATE NOT NULL DEFAULT CURRENT_DATE, status VARCHAR(20) DEFAULT 'Actif', notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS audit_logs (id VARCHAR(100) PRIMARY KEY, user_id VARCHAR(100), user_name VARCHAR(150), action VARCHAR(50) NOT NULL, entity_type VARCHAR(50) NOT NULL, entity_id VARCHAR(100), details TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS password_reset_requests (id VARCHAR(100) PRIMARY KEY, email VARCHAR(150) NOT NULL, user_name VARCHAR(150), reason TEXT, status VARCHAR(20) DEFAULT 'En attente', created_at TIMESTAMPTZ DEFAULT NOW());
 
 -- Enable RLS and add public access policies
 ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
@@ -188,90 +202,133 @@ CREATE POLICY "Public Audit" ON audit_logs FOR ALL USING (true) WITH CHECK (true
         </div>
       </div>
 
-      {/* Live Supabase Connection */}
-      <div className="p-6 rounded-3xl bg-slate-900/60 border border-emerald-500/30 backdrop-blur-2xl shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-base font-bold text-white">Connexion Supabase PostgreSQL</h2>
-            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
-              isSupabaseConnected
-                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-            }`}>
-              {isSupabaseConnected ? 'Connecté & Synchronisé' : 'Configuration Requise / Offline'}
-            </span>
-          </div>
-          <p className="text-xs text-slate-300 max-w-xl">
-            Liez l'application à votre projet Supabase (URL + Anon Key) pour synchroniser la base de données en temps réel et conserver Supabase comme source unique de vérité.
-          </p>
-        </div>
-
-        <button
-          onClick={() => setIsSupabaseModalOpen(true)}
-          className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20 shrink-0 flex items-center gap-2"
-        >
-          <Database className="w-4 h-4" />
-          <span>Configurer la Clé Supabase</span>
-        </button>
-      </div>
-
-      {/* Supabase SQL DDL Exporter */}
+      {/* Keyboard Shortcuts Section */}
       <div className="p-6 rounded-3xl bg-slate-900/60 border border-white/15 backdrop-blur-2xl shadow-xl space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <Database className="w-4 h-4 text-emerald-400" />
-              <span>Architecture BDD PostgreSQL Normalisée (Supabase DDL)</span>
+              <Keyboard className="w-4 h-4 text-cyan-400" />
+              <span>Raccourcis Clavier & Navigation Rapide</span>
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              Script SQL prêt à exécuter dans l'éditeur SQL Supabase pour créer la base de données de production.
+              Optimisez votre productivité en naviguant dans l'application à l'aide de combinaisons de touches.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={copySql}
-              className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
-            >
-              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-cyan-400" />}
-              <span>{copied ? 'Copié !' : 'Copier SQL'}</span>
-            </button>
-            <button
-              onClick={downloadSql}
-              className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 transition-all shadow-lg shadow-emerald-500/20"
-            >
-              <Download className="w-4 h-4" />
-              <span>Télécharger schema.sql</span>
-            </button>
+          <button
+            onClick={() => setIsShortcutsModalOpen(true)}
+            className="px-4 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-semibold text-xs transition-all flex items-center gap-2 shrink-0"
+          >
+            <Command className="w-4 h-4" />
+            <span>Voir Tous les Raccourcis (Ctrl+K)</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2 text-xs text-slate-300">
+          <div className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between">
+            <span>Palette de commandes</span>
+            <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/15 font-mono text-[10px] text-cyan-300 font-bold">Ctrl + K</kbd>
+          </div>
+          <div className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between">
+            <span>Recherche globale</span>
+            <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/15 font-mono text-[10px] text-cyan-300 font-bold">Ctrl + F</kbd>
+          </div>
+          <div className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between">
+            <span>Nouveau paiement</span>
+            <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/15 font-mono text-[10px] text-cyan-300 font-bold">Ctrl + P</kbd>
           </div>
         </div>
-
-        {/* Code Block */}
-        <div className="relative rounded-2xl bg-black/60 border border-white/10 p-4 font-mono text-xs text-cyan-300 max-h-80 overflow-y-auto leading-relaxed shadow-inner">
-          <pre>{sqlSchemaText}</pre>
-        </div>
       </div>
 
-      {/* Data Reset */}
-      <div className="p-6 rounded-3xl bg-slate-900/60 border border-rose-500/30 backdrop-blur-2xl shadow-xl flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-bold text-rose-300 flex items-center gap-2">
-            <RotateCcw className="w-4 h-4" />
-            <span>Réinitialisation des Données</span>
-          </h3>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Restaure les données de démonstration d'origine et efface le stockage local.
-          </p>
-        </div>
+      {/* SuperAdmin Only Sections */}
+      {isSuperAdmin && (
+        <>
+          {/* Live Supabase Connection */}
+          <div className="p-6 rounded-3xl bg-slate-900/60 border border-emerald-500/30 backdrop-blur-2xl shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Database className="w-5 h-5 text-emerald-400" />
+                <h2 className="text-base font-bold text-white">Connexion Supabase PostgreSQL</h2>
+                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                  isSupabaseConnected
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                }`}>
+                  {isSupabaseConnected ? 'Connecté & Synchronisé' : 'Configuration Requise / Offline'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 max-w-xl">
+                Liez l'application à votre projet Supabase (URL + Anon Key) pour synchroniser la base de données en temps réel et conserver Supabase comme source unique de vérité.
+              </p>
+            </div>
 
-        <button
-          onClick={resetToDefaultData}
-          className="px-4 py-2 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-semibold text-xs rounded-xl transition-all"
-        >
-          Restaurer Données
-        </button>
-      </div>
+            <button
+              onClick={() => setIsSupabaseModalOpen(true)}
+              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20 shrink-0 flex items-center gap-2"
+            >
+              <Database className="w-4 h-4" />
+              <span>Configurer la Clé Supabase</span>
+            </button>
+          </div>
+
+          {/* Supabase SQL DDL Exporter */}
+          <div className="p-6 rounded-3xl bg-slate-900/60 border border-white/15 backdrop-blur-2xl shadow-xl space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Database className="w-4 h-4 text-emerald-400" />
+                  <span>Architecture BDD PostgreSQL Normalisée (Supabase DDL)</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Script SQL prêt à exécuter dans l'éditeur SQL Supabase pour créer la base de données de production.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={copySql}
+                  className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                >
+                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-cyan-400" />}
+                  <span>{copied ? 'Copié !' : 'Copier SQL'}</span>
+                </button>
+                <button
+                  onClick={downloadSql}
+                  className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 transition-all shadow-lg shadow-emerald-500/20"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Télécharger schema.sql</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Code Block */}
+            <div className="relative rounded-2xl bg-black/60 border border-white/10 p-4 font-mono text-xs text-cyan-300 max-h-80 overflow-y-auto leading-relaxed shadow-inner">
+              <pre>{sqlSchemaText}</pre>
+            </div>
+          </div>
+
+          {/* Data Reset */}
+          <div className="p-6 rounded-3xl bg-slate-900/60 border border-rose-500/30 backdrop-blur-2xl shadow-xl flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-rose-300 flex items-center gap-2">
+                <RotateCcw className="w-4 h-4" />
+                <span>Réinitialisation des Données</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Restaure les données de démonstration d'origine et efface le stockage local.
+              </p>
+            </div>
+
+            <button
+              onClick={resetToDefaultData}
+              className="px-4 py-2 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-semibold text-xs rounded-xl transition-all"
+            >
+              Restaurer Données
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 };

@@ -140,7 +140,16 @@ export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({ isOpen, onClos
               </label>
               <select
                 value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as any)}
+                onChange={(e) => {
+                  const m = e.target.value as any;
+                  setPaymentMethod(m);
+                  const year = new Date().getFullYear();
+                  const rand = Math.floor(1000 + Math.random() * 9000);
+                  if (m === 'Mobile Money') setReferenceNo(`MM-${year}-${rand}`);
+                  else if (m === 'Chèque') setReferenceNo(`CHQ-${year}-${rand}`);
+                  else if (m === 'Espèces') setReferenceNo(`CASH-${year}-${rand}`);
+                  else setReferenceNo(`VIR-${year}-${rand}`);
+                }}
                 className="w-full px-3 py-2 bg-black/40 border border-white/15 rounded-xl text-white outline-none focus:border-emerald-400"
               >
                 <option value="Virement">Virement Bancaire</option>

@@ -13,7 +13,8 @@ import {
   AuditLog,
   SavedView,
   PurchaseOrder,
-  RateType
+  RateType,
+  PasswordResetRequest
 } from '../types';
 import {
   initialRegions,
@@ -86,12 +87,14 @@ interface AppContextType {
   mediaPayments: MediaPayment[];
   purchaseOrders: PurchaseOrder[];
   auditLogs: AuditLog[];
+  passwordResetRequests: PasswordResetRequest[];
   savedViews: SavedView[];
 
   // Notifications
   notifications: ToastNotification[];
   addNotification: (notif: Omit<ToastNotification, 'id'>) => void;
   removeNotification: (id: string) => void;
+  resolvePasswordResetRequest: (id: string, newStatus: 'Résolu' | 'Rejeté') => void;
 
   // Supabase Sync Actions
   syncFromSupabase: () => Promise<boolean>;
@@ -124,6 +127,7 @@ interface AppContextType {
   addRegion: (r: Omit<Region, 'id' | 'createdAt'>) => void;
 
   addFocalPoint: (fp: Omit<FocalPoint, 'id'>) => void;
+  updateFocalPoint: (fp: FocalPoint) => void;
 
   // Reset & Export
   resetToDefaultData: () => void;
@@ -268,6 +272,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [passwordResetRequests, setPasswordResetRequests] = useState<PasswordResetRequest[]>(() => {
+    const saved = localStorage.getItem('mcm_password_resets');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [savedViews] = useState<SavedView[]>([]);
 
   // Toast Notifications
@@ -341,6 +350,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPurchaseOrders(remoteData.purchaseOrders || []);
     setAuditLogs(remoteData.auditLogs || []);
 
+    const resetReqs = await supabaseService.loadPasswordResetRequests();
+    if (resetReqs && resetReqs.length > 0) {
+      setPasswordResetRequests(resetReqs);
+    }
+
     return true;
   }, []);
 
@@ -372,15 +386,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const matched = users.find(u => u.email.toLowerCase() === targetEmail);
     const userName = matched ? matched.name : targetEmail;
 
+    const newReq: PasswordResetRequest = {
+      id: 'req-' + Date.now(),
+      email: targetEmail,
+      userName,
+      reason: reason || 'Mot de passe oublié',
+      status: 'En attente',
+      createdAt: new Date().toISOString()
+    };
+
+    setPasswordResetRequests(prev => [newReq, ...prev]);
+    localStorage.setItem('mcm_password_resets', JSON.stringify([newReq, ...passwordResetRequests]));
+    supabaseService.savePasswordResetRequest(newReq);
+
     addNotification({
       type: 'warning',
       title: '🔐 Demande de Réinitialisation Mdp',
-      message: `Requête de réinitialisation soumise pour ${userName}. Notification envoyée au SuperAdmin.`
+      message: `Requête enregistrée en base pour ${userName}. Notification transmise au SuperAdmin.`
     });
 
     logAuditAction('Modification', 'Sécurité', `Demande de réinitialisation de mot de passe par ${userName} (${targetEmail}). Motif: ${reason || 'Mot de passe oublié'}`);
-    return { success: true, message: 'Demande envoyée au SuperAdmin.' };
-  }, [users, addNotification, logAuditAction]);
+    return { success: true, message: 'Demande transmise avec succès et enregistrée en base de données.' };
+  }, [users, addNotification, logAuditAction, passwordResetRequests]);
 
   const logout = useCallback(() => {
     setIsAuthenticated(false);
@@ -511,6 +538,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     recalculateAll();
   }, [pricingRates, mediaPayments, events, medias, clients, focalPoints]);
+
+  const computedMediaPayments = useMemo(() => {
+    return mediaPayments.map((pay) => {
+      const targetMedia = medias.find((m) => m.id === pay.mediaId);
+      const targetEvt = events.find((e) => e.id === pay.eventId);
+      const targetClient = clients.find((c) => c.id === (pay.clientId || targetEvt?.clientId));
+      const focalObj = focalPoints.find((fp) => fp.mediaId === pay.mediaId || fp.id === targetMedia?.focalPointId);
+
+      return {
+        ...pay,
+        mediaName: targetMedia?.name || pay.mediaName || 'Média inconnu',
+        eventName: targetEvt?.name || pay.eventName || 'Événement non spécifié',
+        clientName: targetClient?.name || pay.clientName || 'Client non spécifié',
+        focalPointName: focalObj?.name || targetMedia?.focalPointName || pay.focalPointName,
+      };
+    });
+  }, [mediaPayments, medias, events, clients, focalPoints]);
 
   const computedEvents = useMemo(() => {
     return events.map((evt) => {
@@ -789,6 +833,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAuditAction('Création', 'Point Focal', `Ajout point focal "${newFp.name}"`, id);
   };
 
+  const updateFocalPoint = (fp: FocalPoint) => {
+    setFocalPoints((prev) => prev.map((item) => (item.id === fp.id ? fp : item)));
+    supabaseService.saveFocalPoint(fp);
+    logAuditAction('Modification', 'Point Focal', `Modification point focal "${fp.name}"`, fp.id);
+  };
+
+  const resolvePasswordResetRequest = (id: string, newStatus: 'Résolu' | 'Rejeté') => {
+    setPasswordResetRequests(prev => {
+      const updated = prev.map(r => r.id === id ? { ...r, status: newStatus } : r);
+      localStorage.setItem('mcm_password_resets', JSON.stringify(updated));
+      return updated;
+    });
+    const targetReq = passwordResetRequests.find(r => r.id === id);
+    if (targetReq) {
+      supabaseService.savePasswordResetRequest({ ...targetReq, status: newStatus });
+    }
+    addNotification({
+      type: newStatus === 'Résolu' ? 'success' : 'info',
+      title: 'Demande Mdp Mise à Jour',
+      message: `La demande de ${targetReq?.email} a été marquée comme "${newStatus}".`
+    });
+  };
+
   const resetToDefaultData = () => {
     setRegions(initialRegions);
     setClients(initialClients);
@@ -840,13 +907,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         pricingRates,
         events: computedEvents,
         mediaByEvents,
-        mediaPayments,
+        mediaPayments: computedMediaPayments,
         purchaseOrders,
         auditLogs,
+        passwordResetRequests,
         savedViews,
         notifications,
         addNotification,
         removeNotification,
+        resolvePasswordResetRequest,
         syncFromSupabase,
         pushAllDataToSupabase,
         addPurchaseOrder,
@@ -867,6 +936,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateClient,
         addRegion,
         addFocalPoint,
+        updateFocalPoint,
         resetToDefaultData,
         triggerManualSave,
       }}
