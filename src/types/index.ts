@@ -194,3 +194,64 @@ export interface PasswordResetRequest {
   createdAt: string;
 }
 
+export interface UserShortcut {
+  id: string;
+  userId: string;
+  actionId: string;
+  keys: string;
+}
+
+export interface ShortcutActionDef {
+  actionId: string;
+  label: string;
+  description: string;
+  defaultKeys: string;
+  category: 'navigation' | 'actions' | 'general';
+}
+
+export const DEFAULT_SHORTCUT_ACTIONS: ShortcutActionDef[] = [
+  {
+    actionId: 'command_palette',
+    label: 'Palette de commandes',
+    description: 'Ouvrir la recherche et la palette d\'actions rapides',
+    defaultKeys: 'Ctrl + K',
+    category: 'navigation'
+  },
+  {
+    actionId: 'global_search',
+    label: 'Recherche globale',
+    description: 'Placer le curseur dans le champ de recherche global',
+    defaultKeys: 'Ctrl + F',
+    category: 'navigation'
+  },
+  {
+    actionId: 'save_data',
+    label: 'Sauvegarde immédiate',
+    description: 'Forcer la synchronisation et la sauvegarde locale',
+    defaultKeys: 'Ctrl + S',
+    category: 'actions'
+  },
+  {
+    actionId: 'new_payment',
+    label: 'Nouveau paiement',
+    description: 'Ouvrir la fenêtre d\'enregistrement de paiement',
+    defaultKeys: 'Ctrl + P',
+    category: 'actions'
+  },
+  {
+    actionId: 'new_event',
+    label: 'Nouvel événement',
+    description: 'Créer une nouvelle campagne événementielle',
+    defaultKeys: 'Ctrl + E',
+    category: 'actions'
+  },
+  {
+    actionId: 'shortcuts_help',
+    label: 'Aide Raccourcis Clavier',
+    description: 'Ouvrir le popup d\'aide des raccourcis',
+    defaultKeys: 'Ctrl + H',
+    category: 'general'
+  }
+];
+
+

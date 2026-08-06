@@ -12,7 +12,8 @@ import {
   PurchaseOrder,
   User,
   UserRole,
-  RateType
+  RateType,
+  UserShortcut
 } from '../types';
 
 /**
@@ -755,6 +756,45 @@ export const supabaseService = {
       console.error('Erreur chargement demandes mot de passe Supabase:', err);
       return [];
     }
+  },
+
+  // User Shortcuts Table Sync
+  async loadUserShortcuts(userId: string): Promise<UserShortcut[]> {
+    const supabase = getSupabaseClient();
+    if (!supabase || !userId) return [];
+
+    try {
+      const { data, error } = await supabase.from('user_shortcuts').select('*').eq('user_id', userId);
+      if (error || !data) return [];
+      return data.map((item: any) => ({
+        id: item.id,
+        userId: item.user_id,
+        actionId: item.action_id,
+        keys: item.keys
+      }));
+    } catch (err) {
+      console.error('Erreur chargement raccourcis utilisateur Supabase:', err);
+      return [];
+    }
+  },
+
+  async saveUserShortcut(shortcut: UserShortcut): Promise<boolean> {
+    const supabase = getSupabaseClient();
+    if (!supabase) return false;
+
+    try {
+      await upsertWithFallback('user_shortcuts', {
+        id: shortcut.id || `sc-${shortcut.userId}-${shortcut.actionId}`,
+        user_id: shortcut.userId,
+        action_id: shortcut.actionId,
+        keys: shortcut.keys
+      });
+      return true;
+    } catch (err) {
+      console.error('Erreur sauvegarde raccourci utilisateur Supabase:', err);
+      return false;
+    }
   }
 };
+
 

@@ -14,7 +14,9 @@ import {
   SavedView,
   PurchaseOrder,
   RateType,
-  PasswordResetRequest
+  PasswordResetRequest,
+  UserShortcut,
+  DEFAULT_SHORTCUT_ACTIONS
 } from '../types';
 import {
   initialRegions,
@@ -132,6 +134,12 @@ interface AppContextType {
   // Reset & Export
   resetToDefaultData: () => void;
   triggerManualSave: () => void;
+
+  // User Shortcuts
+  userShortcuts: UserShortcut[];
+  getUserShortcutKeys: (actionId: string) => string;
+  updateUserShortcut: (actionId: string, keys: string) => Promise<void>;
+  resetUserShortcutsToDefault: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -592,23 +600,127 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [regions, clients, focalPoints, medias, pricingRates, events, mediaByEvents, mediaPayments, purchaseOrders, auditLogs]);
 
+  // User Shortcuts State
+  const [userShortcuts, setUserShortcuts] = useState<UserShortcut[]>(() => {
+    const saved = localStorage.getItem(`mcm_user_shortcuts_${currentUser?.id || 'default'}`);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const localSaved = localStorage.getItem(`mcm_user_shortcuts_${currentUser.id}`);
+    if (localSaved) {
+      try {
+        setUserShortcuts(JSON.parse(localSaved));
+      } catch (e) {}
+    }
+
+    if (getSupabaseConfig().isConfigured) {
+      supabaseService.loadUserShortcuts(currentUser.id).then((scs) => {
+        if (scs && scs.length > 0) {
+          setUserShortcuts(scs);
+          localStorage.setItem(`mcm_user_shortcuts_${currentUser.id}`, JSON.stringify(scs));
+        }
+      });
+    }
+  }, [currentUser?.id]);
+
+  const getUserShortcutKeys = useCallback((actionId: string): string => {
+    const found = userShortcuts.find((s) => s.actionId === actionId);
+    if (found && found.keys) return found.keys;
+    const def = DEFAULT_SHORTCUT_ACTIONS.find((a) => a.actionId === actionId);
+    return def ? def.defaultKeys : '';
+  }, [userShortcuts]);
+
+  const updateUserShortcut = async (actionId: string, keys: string) => {
+    if (!currentUser?.id) return;
+    const newShortcut: UserShortcut = {
+      id: `sc-${currentUser.id}-${actionId}`,
+      userId: currentUser.id,
+      actionId,
+      keys
+    };
+
+    const updatedList = userShortcuts.filter((s) => s.actionId !== actionId).concat(newShortcut);
+    setUserShortcuts(updatedList);
+    localStorage.setItem(`mcm_user_shortcuts_${currentUser.id}`, JSON.stringify(updatedList));
+
+    if (getSupabaseConfig().isConfigured) {
+      await supabaseService.saveUserShortcut(newShortcut);
+    }
+
+    addNotification({
+      type: 'success',
+      title: 'Raccourci mis à jour',
+      message: `Raccourci enregistré : "${keys}" pour cet utilisateur.`
+    });
+    logAuditAction('Modification', 'Raccourcis Clavier', `Mise à jour du raccourci ${actionId} : ${keys}`);
+  };
+
+  const resetUserShortcutsToDefault = async () => {
+    if (!currentUser?.id) return;
+    setUserShortcuts([]);
+    localStorage.removeItem(`mcm_user_shortcuts_${currentUser.id}`);
+    addNotification({
+      type: 'info',
+      title: 'Raccourcis réinitialisés',
+      message: 'Les raccourcis clavier par défaut ont été réappliqués.'
+    });
+    logAuditAction('Modification', 'Raccourcis Clavier', 'Réinitialisation des raccourcis par défaut');
+  };
+
+  // Keyboard shortcut matching helper
+  const matchShortcutKeys = (e: KeyboardEvent, keysStr: string): boolean => {
+    if (!keysStr) return false;
+    const parts = keysStr.split('+').map((p) => p.trim().toLowerCase());
+    if (parts.length === 0) return false;
+
+    const requiresCtrl = parts.includes('ctrl') || parts.includes('cmd');
+    const requiresShift = parts.includes('shift');
+    const requiresAlt = parts.includes('alt');
+
+    const mainKey = parts.find((p) => !['ctrl', 'cmd', 'shift', 'alt'].includes(p));
+    if (!mainKey) return false;
+
+    const eventCtrl = e.ctrlKey || e.metaKey;
+    const eventShift = e.shiftKey;
+    const eventAlt = e.altKey;
+
+    if (requiresCtrl !== eventCtrl) return false;
+    if (requiresShift !== eventShift) return false;
+    if (requiresAlt !== eventAlt) return false;
+
+    return e.key.toLowerCase() === mainKey;
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      const activeElem = document.activeElement;
+      const isInputFocused = activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA' || activeElem.tagName === 'SELECT');
+
+      const cmdKey = getUserShortcutKeys('command_palette');
+      const saveKey = getUserShortcutKeys('save_data');
+      const searchKey = getUserShortcutKeys('global_search');
+      const helpKey = getUserShortcutKeys('shortcuts_help');
+
+      if (matchShortcutKeys(e, cmdKey)) {
         e.preventDefault();
         setIsCommandPaletteOpen((prev) => !prev);
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      } else if (matchShortcutKeys(e, saveKey)) {
         e.preventDefault();
         triggerManualSave();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+      } else if (matchShortcutKeys(e, searchKey)) {
         e.preventDefault();
         const searchInput = document.getElementById('global-search-input');
         if (searchInput) searchInput.focus();
+      } else if (!isInputFocused && matchShortcutKeys(e, helpKey)) {
+        e.preventDefault();
+        setIsShortcutsModalOpen((prev) => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [getUserShortcutKeys]);
 
   const triggerManualSave = () => {
     addNotification({
@@ -939,6 +1051,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateFocalPoint,
         resetToDefaultData,
         triggerManualSave,
+        userShortcuts,
+        getUserShortcutKeys,
+        updateUserShortcut,
+        resetUserShortcutsToDefault,
       }}
     >
       {children}

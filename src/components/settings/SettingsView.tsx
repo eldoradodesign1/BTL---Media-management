@@ -15,8 +15,10 @@ import {
   Layers,
   Code,
   Keyboard,
-  Command
+  Command,
+  Edit2
 } from 'lucide-react';
+import { DEFAULT_SHORTCUT_ACTIONS } from '../../types';
 
 export const SettingsView: React.FC = () => {
   const {
@@ -27,10 +29,15 @@ export const SettingsView: React.FC = () => {
     setIsSupabaseModalOpen,
     isSupabaseConnected,
     setIsShortcutsModalOpen,
-    currentUser
+    currentUser,
+    getUserShortcutKeys,
+    updateUserShortcut,
+    resetUserShortcutsToDefault
   } = useApp();
 
   const [copied, setCopied] = useState(false);
+  const [editingActionId, setEditingActionId] = useState<string | null>(null);
+  const [editingKeys, setEditingKeys] = useState<string>('');
   const isSuperAdmin = currentUser?.role === 'super-admin';
 
   const sqlSchemaText = `-- =========================================================
@@ -73,6 +80,7 @@ CREATE TABLE IF NOT EXISTS media_payments (id VARCHAR(100) PRIMARY KEY, payment_
 CREATE TABLE IF NOT EXISTS purchase_orders (id VARCHAR(100) PRIMARY KEY, po_number VARCHAR(100) NOT NULL, client_id VARCHAR(100) NOT NULL, amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00, support_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00, fpc_percent NUMERIC(5, 2) NOT NULL DEFAULT 5.00, agency_fees_percent NUMERIC(5, 2) NOT NULL DEFAULT 14.00, po_date DATE NOT NULL DEFAULT CURRENT_DATE, status VARCHAR(20) DEFAULT 'Actif', notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS audit_logs (id VARCHAR(100) PRIMARY KEY, user_id VARCHAR(100), user_name VARCHAR(150), action VARCHAR(50) NOT NULL, entity_type VARCHAR(50) NOT NULL, entity_id VARCHAR(100), details TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS password_reset_requests (id VARCHAR(100) PRIMARY KEY, email VARCHAR(150) NOT NULL, user_name VARCHAR(150), reason TEXT, status VARCHAR(20) DEFAULT 'En attente', created_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS user_shortcuts (id VARCHAR(100) PRIMARY KEY, user_id VARCHAR(100) NOT NULL, action_id VARCHAR(100) NOT NULL, keys VARCHAR(50) NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(), CONSTRAINT unique_user_action_shortcut UNIQUE(user_id, action_id));
 
 -- Enable RLS and add public access policies
 ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
@@ -86,10 +94,13 @@ ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE media_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE media_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payment_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_shortcuts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Public Payment Categories" ON payment_categories;
 CREATE POLICY "Public Payment Categories" ON payment_categories FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public User Shortcuts" ON user_shortcuts;
+CREATE POLICY "Public User Shortcuts" ON user_shortcuts FOR ALL USING (true) WITH CHECK (true);
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Public Roles" ON roles;
@@ -215,41 +226,109 @@ CREATE POLICY "Public Audit" ON audit_logs FOR ALL USING (true) WITH CHECK (true
         </div>
       </div>
 
-      {/* Keyboard Shortcuts Section */}
+      {/* Keyboard Shortcuts Section - Editable Per User */}
       <div className="p-6 rounded-3xl bg-slate-900/60 border border-white/15 backdrop-blur-2xl shadow-xl space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <Keyboard className="w-4 h-4 text-cyan-400" />
-              <span>Raccourcis Clavier & Navigation Rapide</span>
+              <span>Raccourcis Clavier Personnalisés par Utilisateur</span>
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              Optimisez votre productivité en naviguant dans l'application à l'aide de combinaisons de touches.
+              Configuration individuelle enregistrée pour <strong className="text-cyan-300">{currentUser?.name}</strong> ({currentUser?.email}).
             </p>
           </div>
 
-          <button
-            onClick={() => setIsShortcutsModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-semibold text-xs transition-all flex items-center gap-2 shrink-0"
-          >
-            <Command className="w-4 h-4" />
-            <span>Voir Tous les Raccourcis (Ctrl+K)</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => resetUserShortcutsToDefault()}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/10 font-semibold text-xs transition-all flex items-center gap-1.5"
+              title="Restaurer la configuration par défaut"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+              <span>Réinitialiser</span>
+            </button>
+
+            <button
+              onClick={() => setIsShortcutsModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-semibold text-xs transition-all flex items-center gap-1.5"
+            >
+              <Command className="w-3.5 h-3.5" />
+              <span>Guide des Touches</span>
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2 text-xs text-slate-300">
-          <div className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between">
-            <span>Palette de commandes</span>
-            <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/15 font-mono text-[10px] text-cyan-300 font-bold">Ctrl + K</kbd>
-          </div>
-          <div className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between">
-            <span>Recherche globale</span>
-            <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/15 font-mono text-[10px] text-cyan-300 font-bold">Ctrl + F</kbd>
-          </div>
-          <div className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between">
-            <span>Nouveau paiement</span>
-            <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/15 font-mono text-[10px] text-cyan-300 font-bold">Ctrl + P</kbd>
-          </div>
+          {DEFAULT_SHORTCUT_ACTIONS.map((action) => {
+            const activeKeys = getUserShortcutKeys(action.actionId);
+            const isEditing = editingActionId === action.actionId;
+
+            return (
+              <div
+                key={action.actionId}
+                className={`p-3.5 rounded-2xl bg-black/40 border transition-all flex flex-col justify-between gap-2 ${
+                  isEditing ? 'border-cyan-500/60 ring-2 ring-cyan-500/20 bg-slate-950/80' : 'border-white/10 hover:border-white/20'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-bold text-white text-xs">{action.label}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{action.description}</div>
+                  </div>
+
+                  {!isEditing ? (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/15 font-mono text-[10px] text-cyan-300 font-bold shadow-inner">
+                        {activeKeys}
+                      </kbd>
+                      <button
+                        onClick={() => {
+                          setEditingActionId(action.actionId);
+                          setEditingKeys(activeKeys);
+                        }}
+                        className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                        title="Modifier ce raccourci"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                {isEditing && (
+                  <div className="mt-1 pt-2 border-t border-white/10 flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={editingKeys}
+                      onChange={(e) => setEditingKeys(e.target.value)}
+                      placeholder="Ex: Ctrl + K, Alt + S"
+                      className="flex-1 px-2 py-1 rounded-xl bg-slate-900 border border-cyan-500/50 text-cyan-300 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-cyan-400"
+                      autoFocus
+                    />
+                    <button
+                      onClick={async () => {
+                        if (editingKeys.trim()) {
+                          await updateUserShortcut(action.actionId, editingKeys.trim());
+                        }
+                        setEditingActionId(null);
+                      }}
+                      className="px-2 py-1 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-[11px] transition-all flex items-center gap-1 shrink-0"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>OK</span>
+                    </button>
+                    <button
+                      onClick={() => setEditingActionId(null)}
+                      className="px-2 py-1 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 text-[11px] transition-colors shrink-0"
+                    >
+                      X
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
