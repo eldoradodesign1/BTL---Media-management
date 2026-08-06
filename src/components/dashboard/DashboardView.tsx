@@ -1,5 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
+import { PurchaseOrderModal } from '../modals/PurchaseOrderModal';
+import { AddPaymentModal } from '../modals/AddPaymentModal';
+import { EditEventModal } from '../modals/EditEventModal';
 import ReactECharts from 'echarts-for-react';
 import {
   DollarSign,
@@ -13,521 +16,651 @@ import {
   Layers,
   PieChart,
   BarChart3,
-  Flame,
-  Grid
+  Plus,
+  FileSpreadsheet,
+  Building2,
+  ChevronRight,
+  Info,
+  ShieldAlert,
+  ArrowUpRight,
+  Sparkles,
+  Edit
 } from 'lucide-react';
 
 export const DashboardView: React.FC = () => {
-  const { mediaByEvents, events, clients, medias, regions, theme } = useApp();
+  const {
+    mediaByEvents,
+    mediaPayments,
+    purchaseOrders,
+    events,
+    clients,
+    medias,
+    regions,
+    currentUser,
+    theme
+  } = useApp();
+
+  // Filters State
+  const isClientRole = currentUser?.role === 'client';
+  const defaultClientId = isClientRole ? (currentUser?.clientId || clients[0]?.id || 'all') : 'all';
+
+  const [selectedClientId, setSelectedClientId] = useState<string>(defaultClientId);
+  const [selectedMonth, setSelectedMonth] = useState<string>('all'); // 'all', '0', '1', ...
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+
+  // Modals state
+  const [isPoModalOpen, setIsPoModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isEditEventModalOpen, setIsEditEventModalOpen] = useState(false);
 
   // Color palette depending on theme
   const isDark = theme === 'dark';
   const textColor = isDark ? '#e2e8f0' : '#1e293b';
   const subTextColor = isDark ? '#94a3b8' : '#64748b';
 
-  // 1. KPI Calculations
-  const kpis = useMemo(() => {
-    const totalAmount = mediaByEvents.reduce((acc, curr) => acc + curr.amount, 0);
-    const totalPaid = mediaByEvents.reduce((acc, curr) => acc + curr.paid, 0);
-    const totalPending = mediaByEvents.reduce((acc, curr) => acc + curr.pending, 0);
-    const activeEvents = events.filter((e) => e.status === 'En cours' || e.status === 'Planifié').length;
-    const paidRatio = totalAmount > 0 ? Math.round((totalPaid / totalAmount) * 100) : 0;
+  const monthsList = [
+    { label: 'Janv', value: '0' },
+    { label: 'Févr', value: '1' },
+    { label: 'Mars', value: '2' },
+    { label: 'Avr', value: '3' },
+    { label: 'Mai', value: '4' },
+    { label: 'Juin', value: '5' },
+    { label: 'Juil', value: '6' },
+    { label: 'Août', value: '7' },
+    { label: 'Sept', value: '8' },
+    { label: 'Oct', value: '9' },
+    { label: 'Nov', value: '10' },
+    { label: 'Déc', value: '11' }
+  ];
 
-    return { totalAmount, totalPaid, totalPending, activeEvents, paidRatio };
-  }, [mediaByEvents, events]);
+  // Filtered Data Sets
+  const filteredPOs = useMemo(() => {
+    if (selectedClientId === 'all') return purchaseOrders;
+    return purchaseOrders.filter((po) => po.clientId === selectedClientId);
+  }, [purchaseOrders, selectedClientId]);
 
-  // 2. Client Breakdown (Donut Chart)
-  const clientData = useMemo(() => {
+  const filteredEvents = useMemo(() => {
+    return events.filter((e) => {
+      if (selectedClientId !== 'all' && e.clientId !== selectedClientId) return false;
+      if (selectedMonth !== 'all') {
+        const monthIndex = new Date(e.eventDate).getMonth().toString();
+        if (monthIndex !== selectedMonth) return false;
+      }
+      return true;
+    });
+  }, [events, selectedClientId, selectedMonth]);
+
+  const filteredMediaEvents = useMemo(() => {
+    return mediaByEvents.filter((m) => {
+      if (selectedClientId !== 'all') {
+        const evt = events.find((e) => e.id === m.eventId);
+        if (evt && evt.clientId !== selectedClientId) return false;
+      }
+      if (selectedMonth !== 'all') {
+        const dateStr = m.eventDate || events.find((e) => e.id === m.eventId)?.eventDate;
+        if (dateStr) {
+          const monthIndex = new Date(dateStr).getMonth().toString();
+          if (monthIndex !== selectedMonth) return false;
+        }
+      }
+      return true;
+    });
+  }, [mediaByEvents, events, selectedClientId, selectedMonth]);
+
+  const filteredPayments = useMemo(() => {
+    return mediaPayments.filter((p) => {
+      if (selectedClientId !== 'all' && p.clientId && p.clientId !== selectedClientId) return false;
+      if (selectedMonth !== 'all' && p.paymentDate) {
+        const monthIndex = new Date(p.paymentDate).getMonth().toString();
+        if (monthIndex !== selectedMonth) return false;
+      }
+      return true;
+    });
+  }, [mediaPayments, selectedClientId, selectedMonth]);
+
+  // Executive Financial Metrics Calculation
+  const financialMetrics = useMemo(() => {
+    const totalPO = filteredPOs.reduce((sum, po) => sum + po.amount, 0);
+    const totalSupport = filteredPOs.reduce((sum, po) => sum + (po.supportAmount || 0), 0);
+    const totalFPC = filteredPOs.reduce((sum, po) => sum + (po.amount * (po.fpcPercent || 5)) / 100, 0);
+    const totalAgencyFees = filteredPOs.reduce((sum, po) => sum + (po.amount * (po.agencyFeesPercent || 14)) / 100, 0);
+    const totalPaymentsExecuted = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
+    const balance = totalPO - totalPaymentsExecuted - totalFPC - totalAgencyFees - totalSupport;
+    const totalPending = filteredMediaEvents.reduce((sum, m) => sum + m.pending, 0);
+    const totalAmountEngaged = filteredMediaEvents.reduce((sum, m) => sum + m.amount, 0);
+
+    return {
+      totalPO,
+      totalSupport,
+      totalFPC,
+      totalAgencyFees,
+      totalPaymentsExecuted,
+      balance,
+      totalPending,
+      totalAmountEngaged
+    };
+  }, [filteredPOs, filteredPayments, filteredMediaEvents]);
+
+  // Selected Event Details Card
+  const activeEventDetail = useMemo(() => {
+    if (!selectedEventId) {
+      return filteredEvents[0] || null;
+    }
+    return events.find((e) => e.id === selectedEventId) || null;
+  }, [selectedEventId, filteredEvents, events]);
+
+  const activeEventDiffusions = useMemo(() => {
+    if (!activeEventDetail) return [];
+    return mediaByEvents.filter((m) => m.eventId === activeEventDetail.id);
+  }, [activeEventDetail, mediaByEvents]);
+
+  const activeEventMetrics = useMemo(() => {
+    if (!activeEventDetail) return { mediaCount: 0, total: 0, paid: 0, pending: 0 };
+    const total = activeEventDiffusions.reduce((sum, m) => sum + m.amount, 0);
+    const paid = activeEventDiffusions.reduce((sum, m) => sum + m.paid, 0);
+    const pending = activeEventDiffusions.reduce((sum, m) => sum + m.pending, 0);
+    return {
+      mediaCount: activeEventDiffusions.length,
+      total,
+      paid,
+      pending
+    };
+  }, [activeEventDetail, activeEventDiffusions]);
+
+  // 1. Monthly Bar Chart Option
+  const monthlyChartOption = useMemo(() => {
+    const months = ['JANV', 'FÉVR', 'MARS', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛT', 'SEPT', 'OCT', 'NOV', 'DÉC'];
+    const amountData = new Array(12).fill(0);
+    const paidData = new Array(12).fill(0);
+
+    filteredMediaEvents.forEach((m) => {
+      const dateStr = m.eventDate || events.find((e) => e.id === m.eventId)?.eventDate;
+      if (dateStr) {
+        const mIdx = new Date(dateStr).getMonth();
+        if (mIdx >= 0 && mIdx < 12) {
+          amountData[mIdx] += m.amount;
+        }
+      }
+    });
+
+    filteredPayments.forEach((p) => {
+      if (p.paymentDate) {
+        const mIdx = new Date(p.paymentDate).getMonth();
+        if (mIdx >= 0 && mIdx < 12) {
+          paidData[mIdx] += p.amount;
+        }
+      }
+    });
+
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        textStyle: { color: '#f8fafc', fontSize: 11 },
+        formatter: (params: any[]) => {
+          let res = `<div class="font-bold border-b border-white/10 pb-1 mb-1 text-blue-300">${params[0].axisValue}</div>`;
+          params.forEach((item) => {
+            res += `<div class="flex items-center justify-between gap-4 text-xs py-0.5">
+              <span>${item.marker} ${item.seriesName}:</span>
+              <span class="font-mono font-bold">$${item.value.toLocaleString('fr-FR')}</span>
+            </div>`;
+          });
+          return res;
+        }
+      },
+      legend: {
+        top: '0',
+        right: '10',
+        textStyle: { color: textColor, fontSize: 11 }
+      },
+      grid: { left: '3%', right: '3%', bottom: '10%', top: '18%', containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: months,
+        axisLabel: { color: textColor, fontSize: 10, fontWeight: 'bold' },
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } }
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: { color: textColor, formatter: '${value}' },
+        splitLine: { lineStyle: { color: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' } }
+      },
+      series: [
+        {
+          name: 'Budget Engagé',
+          type: 'bar',
+          data: amountData,
+          itemStyle: {
+            color: '#60a5fa',
+            borderRadius: [6, 6, 0, 0]
+          }
+        },
+        {
+          name: 'Paiements Effectués',
+          type: 'bar',
+          data: paidData,
+          itemStyle: {
+            color: '#34d399',
+            borderRadius: [6, 6, 0, 0]
+          }
+        }
+      ]
+    };
+  }, [filteredMediaEvents, filteredPayments, events, textColor, isDark]);
+
+  // 2. Client Breakdown Donut
+  const clientChartOption = useMemo(() => {
     const map: Record<string, number> = {};
-    mediaByEvents.forEach((m) => {
+    filteredMediaEvents.forEach((m) => {
       const name = m.clientName || 'Inconnu';
       map[name] = (map[name] || 0) + m.amount;
     });
-    return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [mediaByEvents]);
-
-  const clientChartOption = {
-    tooltip: { trigger: 'item', formatter: '{b}: ${c} ({d}%)' },
-    legend: { bottom: '0', textStyle: { color: textColor, fontSize: 11 } },
-    series: [
-      {
-        name: 'Répartition Client',
-        type: 'pie',
-        radius: ['40%', '70%'],
-        avoidLabelOverlap: false,
-        itemStyle: { borderRadius: 8, borderColor: isDark ? '#0f172a' : '#ffffff', borderWidth: 2 },
-        label: { show: false },
-        emphasis: { label: { show: true, fontSize: 12, fontWeight: 'bold' } },
-        data: clientData,
-      },
-    ],
-  };
-
-  // 3. Media Breakdown (Bar Chart)
-  const mediaData = useMemo(() => {
-    const map: Record<string, number> = {};
-    mediaByEvents.forEach((m) => {
-      const name = m.mediaName || 'Inconnu';
-      map[name] = (map[name] || 0) + m.amount;
-    });
-    const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]);
-    return {
-      categories: sorted.map((s) => s[0]),
-      values: sorted.map((s) => s[1]),
-    };
-  }, [mediaByEvents]);
-
-  const mediaChartOption = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
-    xAxis: {
-      type: 'category',
-      data: mediaData.categories,
-      axisLabel: { color: textColor, rotate: 25, fontSize: 10 },
-      axisLine: { lineStyle: { color: subTextColor } },
-    },
-    yAxis: {
-      type: 'value',
-      axisLabel: { color: textColor, formatter: '${value}' },
-      splitLine: { lineStyle: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } },
-    },
-    series: [
-      {
-        data: mediaData.values,
-        type: 'bar',
-        itemStyle: {
-          color: {
-            type: 'linear',
-            x: 0,
-            y: 0,
-            x2: 0,
-            y2: 1,
-            colorStops: [
-              { offset: 0, color: '#06b6d4' },
-              { offset: 1, color: '#3b82f6' },
-            ],
-          },
-          borderRadius: [6, 6, 0, 0],
-        },
-      },
-    ],
-  };
-
-  // 4. Region Breakdown (Pie/Rose Chart)
-  const regionData = useMemo(() => {
-    const map: Record<string, number> = {};
-    mediaByEvents.forEach((m) => {
-      const evt = events.find((e) => e.id === m.eventId);
-      const regName = evt?.regionName || 'Région Inconnue';
-      map[regName] = (map[regName] || 0) + m.amount;
-    });
-    return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [mediaByEvents, events]);
-
-  const regionChartOption = {
-    tooltip: { trigger: 'item', formatter: '{b}: ${c} ({d}%)' },
-    series: [
-      {
-        type: 'pie',
-        roseType: 'area',
-        radius: [15, 80],
-        itemStyle: { borderRadius: 6 },
-        data: regionData,
-      },
-    ],
-  };
-
-  // 5. Sunburst Chart (Hierarchical Budget: Client -> Event -> Media)
-  const sunburstData = useMemo(() => {
-    const tree: any[] = [];
-    clients.forEach((c) => {
-      const clientEvents = events.filter((e) => e.clientId === c.id);
-      if (clientEvents.length === 0) return;
-
-      const eventChildren: any[] = [];
-      clientEvents.forEach((e) => {
-        const diffusions = mediaByEvents.filter((m) => m.eventId === e.id);
-        if (diffusions.length === 0) return;
-
-        const mediaChildren = diffusions.map((m) => ({
-          name: m.mediaName,
-          value: m.amount,
-        }));
-
-        eventChildren.push({
-          name: e.name,
-          children: mediaChildren,
-        });
-      });
-
-      if (eventChildren.length > 0) {
-        tree.push({
-          name: c.name,
-          children: eventChildren,
-        });
-      }
-    });
-    return tree;
-  }, [clients, events, mediaByEvents]);
-
-  const sunburstOption = {
-    tooltip: { trigger: 'item', formatter: '{b}: ${c}' },
-    series: {
-      type: 'sunburst',
-      data: sunburstData,
-      radius: [0, '90%'],
-      label: { rotate: 'radial', fontSize: 10, color: '#ffffff' },
-      itemStyle: { borderRadius: 4, borderWidth: 2 },
-    },
-  };
-
-  // 6. Treemap Chart (Hierarchical Spending Overview)
-  const treemapData = useMemo(() => {
-    return regions.map((r) => {
-      const regEvents = events.filter((e) => e.regionId === r.id);
-      const children = regEvents.map((e) => {
-        const diffs = mediaByEvents.filter((m) => m.eventId === e.id);
-        const sum = diffs.reduce((acc, curr) => acc + curr.amount, 0);
-        return {
-          name: e.name,
-          value: sum,
-        };
-      }).filter((c) => c.value > 0);
-
-      return {
-        name: r.name,
-        value: children.reduce((s, c) => s + c.value, 0),
-        children,
-      };
-    }).filter((r) => r.value > 0);
-  }, [regions, events, mediaByEvents]);
-
-  const treemapOption = {
-    tooltip: { trigger: 'item', formatter: '{b}: ${c}' },
-    series: [
-      {
-        type: 'treemap',
-        data: treemapData,
-        leafDepth: 1,
-        levels: [
-          { itemStyle: { borderColor: '#555', borderWidth: 2, gapWidth: 2 } },
-          { colorSaturation: [0.3, 0.6], itemStyle: { borderColorSaturation: 0.7, gapWidth: 1 } },
-        ],
-      },
-    ],
-  };
-
-  // 7. Radar Chart (Media Type Performance / Coverage: TV, Radio, Presse, Digital, OOH)
-  const radarData = useMemo(() => {
-    const typesMap: Record<string, number> = {
-      TV: 0,
-      Radio: 0,
-      'Presse Écrite': 0,
-      Digital: 0,
-      'Affichage (OOH)': 0,
-    };
-
-    mediaByEvents.forEach((m) => {
-      const targetMedia = medias.find((med) => med.id === m.mediaId);
-      if (targetMedia && typesMap[targetMedia.type] !== undefined) {
-        typesMap[targetMedia.type] += m.amount;
-      }
-    });
-
-    const maxValue = Math.max(...Object.values(typesMap), 1000);
+    const data = Object.entries(map).map(([name, value]) => ({ name, value }));
 
     return {
-      indicator: [
-        { name: 'TV', max: maxValue },
-        { name: 'Radio', max: maxValue },
-        { name: 'Presse', max: maxValue },
-        { name: 'Digital', max: maxValue },
-        { name: 'Affichage', max: maxValue },
-      ],
-      values: [
-        typesMap['TV'],
-        typesMap['Radio'],
-        typesMap['Presse Écrite'],
-        typesMap['Digital'],
-        typesMap['Affichage (OOH)'],
-      ],
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        textStyle: { color: '#f8fafc', fontSize: 11 },
+        formatter: '{b}: ${c} ({d}%)'
+      },
+      legend: { bottom: '0', textStyle: { color: textColor, fontSize: 10 } },
+      series: [
+        {
+          name: 'Budget par Client',
+          type: 'pie',
+          radius: ['45%', '75%'],
+          avoidLabelOverlap: false,
+          itemStyle: { borderRadius: 8, borderColor: isDark ? '#0f172a' : '#ffffff', borderWidth: 2 },
+          label: { show: false },
+          data
+        }
+      ]
     };
-  }, [mediaByEvents, medias]);
-
-  const radarOption = {
-    tooltip: {},
-    radar: {
-      indicator: radarData.indicator,
-      axisName: { color: textColor, fontSize: 11 },
-      splitArea: {
-        areaStyle: {
-          color: isDark ? ['rgba(255,255,255,0.02)', 'rgba(255,255,255,0.06)'] : ['rgba(0,0,0,0.02)', 'rgba(0,0,0,0.05)'],
-        },
-      },
-    },
-    series: [
-      {
-        name: 'Budget par Type de Média',
-        type: 'radar',
-        data: [
-          {
-            value: radarData.values,
-            name: 'Budget Engage ($)',
-            areaStyle: { color: 'rgba(6, 182, 212, 0.35)' },
-            lineStyle: { color: '#06b6d4', width: 2 },
-            itemStyle: { color: '#38bdf8' },
-          },
-        ],
-      },
-    ],
-  };
-
-  // 8. Heatmap (Media vs Months Spending Matrix)
-  const heatmapData = useMemo(() => {
-    const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'];
-    const mediaList = medias.slice(0, 6).map((m) => m.name);
-
-    const matrix: any[] = [];
-    mediaList.forEach((mName, mIdx) => {
-      months.forEach((mNameStr, monthIdx) => {
-        // Calculate total for this media in this month
-        const sum = mediaByEvents
-          .filter((m) => {
-            if (m.mediaName !== mName) return false;
-            const dateObj = new Date(m.eventDate);
-            return dateObj.getMonth() === monthIdx;
-          })
-          .reduce((acc, curr) => acc + curr.amount, 0);
-
-        matrix.push([monthIdx, mIdx, sum]);
-      });
-    });
-
-    return { months, mediaList, matrix };
-  }, [medias, mediaByEvents]);
-
-  const heatmapOption = {
-    tooltip: { position: 'top', formatter: (p: any) => `${heatmapData.mediaList[p.data[1]]} (${heatmapData.months[p.data[0]]}): $${p.data[2]}` },
-    grid: { height: '65%', top: '10%' },
-    xAxis: { type: 'category', data: heatmapData.months, axisLabel: { color: textColor } },
-    yAxis: { type: 'category', data: heatmapData.mediaList, axisLabel: { color: textColor } },
-    visualMap: {
-      min: 0,
-      max: 3000,
-      calculable: true,
-      orient: 'horizontal',
-      left: 'center',
-      bottom: '0%',
-      inRange: { color: ['#0f172a', '#0284c7', '#38bdf8', '#34d399'] },
-      textStyle: { color: textColor },
-    },
-    series: [
-      {
-        type: 'heatmap',
-        data: heatmapData.matrix,
-        label: { show: false },
-        emphasis: {
-          itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' },
-        },
-      },
-    ],
-  };
+  }, [filteredMediaEvents, textColor, isDark]);
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
-      {/* Top Welcome Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-2xl shadow-2xl relative overflow-hidden">
-        <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 text-xs font-semibold text-blue-400 uppercase tracking-widest mb-1">
-            <TrendingUp className="w-4 h-4" />
-            <span>Vue d'ensemble analytique</span>
+      {/* Top Header Filter & Actions Bar */}
+      <div className="p-4 rounded-3xl bg-slate-900/60 border border-white/15 backdrop-blur-2xl shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="p-2.5 rounded-2xl bg-blue-500/20 text-blue-400 border border-blue-500/30 shrink-0">
+            <Building2 className="w-5 h-5" />
           </div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">Tableau de Bord des Campagnes Média</h1>
-          <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
-            Agrégation en temps réel des budgets engagés, règlements aux médias et restes à payer par client et région.
-          </p>
+          <div className="flex-1 md:flex-none">
+            <label className="block text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-0.5">
+              Client BTL Sélectionné
+            </label>
+            <select
+              value={selectedClientId}
+              onChange={(e) => setSelectedClientId(e.target.value)}
+              disabled={isClientRole}
+              className="bg-black/50 border border-white/15 text-white font-bold text-xs rounded-xl px-3 py-1.5 outline-none focus:border-blue-400 w-full md:w-72 shadow-inner"
+            >
+              {!isClientRole && <option value="all">Tous les Clients (Vue Globale)</option>}
+              {clients.map((c) => (
+                <option key={c.id} value={c.id} className="bg-slate-900 text-white">
+                  {c.name} ({c.code})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 relative z-10 shrink-0">
-          <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-right">
-            <div className="text-[10px] text-slate-400 font-medium">Taux de Règlement</div>
-            <div className="text-xl font-bold font-mono text-emerald-400">{kpis.paidRatio}%</div>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3 justify-end">
+          {(!isClientRole || currentUser?.role === 'super-admin' || currentUser?.role === 'admin' || currentUser?.role === 'finance') && (
+            <button
+              onClick={() => setIsPoModalOpen(true)}
+              className="px-4 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-2 shadow-xl shadow-blue-600/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>+ Enregistrer un PO Reçu</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setIsPaymentModalOpen(true)}
+            className="px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-xl shadow-emerald-600/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Nouveau Paiement</span>
+          </button>
+        </div>
+      </div>
+
+      {/* EXECUTIVE FINANCIAL SUMMARY GRID (Glassmorphic Elegance) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Card 1: Budget Reçu (PO) & Imputations (FPC 5% + Fees 14%) */}
+        <div className="lg:col-span-5 p-6 rounded-3xl bg-slate-900/80 border border-white/15 backdrop-blur-2xl shadow-2xl flex flex-col justify-between space-y-4 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-blue-500/20 transition-all"></div>
+          
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-blue-300 uppercase tracking-widest flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4 text-blue-400" />
+              Budget Client (PO Reçu)
+            </span>
+            <span className="text-[10px] px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 font-mono font-bold">
+              {filteredPOs.length} PO(s) enregistré(s)
+            </span>
           </div>
-          <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-right">
-            <div className="text-[10px] text-slate-400 font-medium">Événements Actifs</div>
-            <div className="text-xl font-bold font-mono text-blue-400">{kpis.activeEvents}</div>
+
+          <div className="p-4 rounded-2xl bg-black/40 border border-white/10 shadow-inner flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                Montant Total des Orders de Paiement
+              </span>
+              <span className="text-3xl font-black font-mono tracking-tight text-white">
+                ${financialMetrics.totalPO.toLocaleString('fr-FR')}
+              </span>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] text-slate-400 font-semibold block uppercase">Devise</span>
+              <span className="text-xs font-bold text-emerald-400 font-mono">USD $</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-slate-200">
+              <span className="text-[10px] text-slate-400 font-semibold block uppercase">
+                Agency Fees (14%)
+              </span>
+              <span className="text-lg font-bold font-mono text-slate-100">
+                ${financialMetrics.totalAgencyFees.toLocaleString('fr-FR')}
+              </span>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-purple-950/20 border border-purple-500/20 text-slate-200">
+              <span className="text-[10px] text-purple-300 font-semibold block uppercase">
+                FPC Agence (5%)
+              </span>
+              <span className="text-lg font-bold font-mono text-purple-300">
+                ${financialMetrics.totalFPC.toLocaleString('fr-FR')}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 2: Suivi, Payments, Support & BALANCE */}
+        <div className="lg:col-span-4 p-6 rounded-3xl bg-slate-900/80 border border-white/15 backdrop-blur-2xl shadow-2xl flex flex-col justify-between space-y-4 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">
+              Suivi & Solde Disponible
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">
+              PO - Fees - FPC - Support - Payments
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-2xl bg-red-950/20 border border-red-500/20">
+              <span className="text-[10px] text-red-300 font-semibold block uppercase">Support Fixe</span>
+              <span className="text-base font-bold font-mono text-red-300">
+                ${financialMetrics.totalSupport.toLocaleString('fr-FR')}
+              </span>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-blue-950/20 border border-blue-500/20">
+              <span className="text-[10px] text-blue-300 font-semibold block uppercase">Paiements Effectués</span>
+              <span className="text-base font-bold font-mono text-blue-300">
+                ${financialMetrics.totalPaymentsExecuted.toLocaleString('fr-FR')}
+              </span>
+            </div>
+          </div>
+
+          {/* BALANCE DISPLAY CARD */}
+          <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/40 shadow-lg shadow-emerald-500/5 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-widest block">
+                Balance Restante Disponible
+              </span>
+              <span className="text-3xl font-black font-mono tracking-tight text-emerald-300">
+                ${financialMetrics.balance.toLocaleString('fr-FR')}
+              </span>
+            </div>
+            <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              <TrendingUp className="w-6 h-6" />
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Total Pending (Restes à Payer Médias - Refined, No Harsh Red Button) */}
+        <div className="lg:col-span-3 space-y-3 flex flex-col justify-between">
+          <div className="p-5 rounded-3xl bg-amber-950/20 border border-amber-500/30 backdrop-blur-2xl shadow-xl flex flex-col justify-between h-full">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-amber-400" />
+                  Restes à Payer Médias
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  Pending
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-400 block mb-1">
+                Engagements diffusions non encore réglés aux médias
+              </span>
+              <div className="text-3xl font-black font-mono text-amber-300 tracking-tight my-2">
+                ${financialMetrics.totalPending.toLocaleString('fr-FR')}
+              </div>
+            </div>
+
+            {/* Month Filter Selector Pills */}
+            <div className="pt-3 border-t border-amber-500/20">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-2">
+                Mois de Diffusion
+              </span>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  onClick={() => setSelectedMonth('all')}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                    selectedMonth === 'all'
+                      ? 'bg-amber-500/30 text-amber-200 border border-amber-500/40 shadow-sm'
+                      : 'bg-black/30 text-slate-400 hover:bg-white/10'
+                  }`}
+                >
+                  Tous
+                </button>
+                {monthsList.map((m) => (
+                  <button
+                    key={m.value}
+                    onClick={() => setSelectedMonth(m.value)}
+                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold transition-all ${
+                      selectedMonth === m.value
+                        ? 'bg-amber-500 text-slate-950 font-bold'
+                        : 'bg-black/30 text-slate-400 hover:bg-white/10'
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI 1 */}
-        <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-2xl shadow-xl flex items-center justify-between group hover:bg-white/10 hover:border-white/20 transition-all">
-          <div>
-            <span className="text-xs text-slate-400 font-medium block mb-1">Budget Total Engagé</span>
-            <span className="text-2xl font-extrabold font-mono text-white tracking-tight">
-              ${kpis.totalAmount.toLocaleString('fr-FR')}
-            </span>
-            <div className="text-[10px] text-blue-400 mt-1 font-medium flex items-center gap-1">
-              <span>{mediaByEvents.length} lignes de diffusion</span>
-            </div>
-          </div>
-          <div className="p-3 rounded-2xl bg-blue-500/20 text-blue-300 border border-blue-500/30 group-hover:scale-110 transition-transform">
-            <DollarSign className="w-6 h-6" />
-          </div>
-        </div>
-
-        {/* KPI 2 */}
-        <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-2xl shadow-xl flex items-center justify-between group hover:bg-white/10 hover:border-white/20 transition-all">
-          <div>
-            <span className="text-xs text-slate-400 font-medium block mb-1">Total Montants Payés</span>
-            <span className="text-2xl font-extrabold font-mono text-emerald-400 tracking-tight">
-              ${kpis.totalPaid.toLocaleString('fr-FR')}
-            </span>
-            <div className="text-[10px] text-emerald-400 mt-1 font-medium flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" />
-              <span>Réglé aux points focaux</span>
-            </div>
-          </div>
-          <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 group-hover:scale-110 transition-transform">
-            <CheckCircle2 className="w-6 h-6" />
-          </div>
-        </div>
-
-        {/* KPI 3 */}
-        <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-2xl shadow-xl flex items-center justify-between group hover:bg-white/10 hover:border-white/20 transition-all">
-          <div>
-            <span className="text-xs text-slate-400 font-medium block mb-1">Restes à Payer (Solde)</span>
-            <span className="text-2xl font-extrabold font-mono text-amber-400 tracking-tight">
-              ${kpis.totalPending.toLocaleString('fr-FR')}
-            </span>
-            <div className="text-[10px] text-amber-400 mt-1 font-medium flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              <span>En attente de paiement</span>
-            </div>
-          </div>
-          <div className="p-3 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 group-hover:scale-110 transition-transform">
-            <Clock className="w-6 h-6" />
-          </div>
-        </div>
-
-        {/* KPI 4 */}
-        <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-2xl shadow-xl flex items-center justify-between group hover:bg-white/10 hover:border-white/20 transition-all">
-          <div>
-            <span className="text-xs text-slate-400 font-medium block mb-1">Nombre de Médias Moby</span>
-            <span className="text-2xl font-extrabold font-mono text-purple-300 tracking-tight">
-              {medias.length}
-            </span>
-            <div className="text-[10px] text-purple-400 mt-1 font-medium flex items-center gap-1">
-              <Tv className="w-3 h-3" />
-              <span>{clients.length} Clients majeurs</span>
-            </div>
-          </div>
-          <div className="p-3 rounded-2xl bg-purple-500/20 text-purple-400 border border-purple-500/30 group-hover:scale-110 transition-transform">
-            <Tv className="w-6 h-6" />
-          </div>
-        </div>
-      </div>
-
-      {/* Primary Analytics Section (ECharts) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Client Distribution */}
-        <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-2xl shadow-xl flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <PieChart className="w-4 h-4 text-blue-400" />
-              <span>Répartition par Client</span>
+      {/* MIDDLE SECTION: Events List + Comparative Monthly Chart + Event Detail Card */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left: Events Selector List */}
+        <div className="lg:col-span-3 p-5 rounded-3xl bg-slate-900/80 border border-white/15 backdrop-blur-2xl flex flex-col justify-between max-h-[440px]">
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/10">
+            <h3 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-blue-400" />
+              Événements ({filteredEvents.length})
             </h3>
-            <span className="text-[10px] font-mono text-slate-400">Pourcentage</span>
+            <span className="text-[10px] text-slate-400">Sélection</span>
           </div>
-          <ReactECharts option={clientChartOption} style={{ height: '260px' }} />
+
+          <div className="space-y-2 overflow-y-auto pr-1 flex-1">
+            {filteredEvents.length === 0 ? (
+              <div className="text-center py-8 text-xs text-slate-400">
+                Aucun événement pour ce critère.
+              </div>
+            ) : (
+              filteredEvents.map((e) => {
+                const isSelected = activeEventDetail?.id === e.id;
+                return (
+                  <button
+                    key={e.id}
+                    onClick={() => setSelectedEventId(e.id)}
+                    className={`w-full text-left p-3 rounded-2xl text-xs transition-all flex items-center justify-between border ${
+                      isSelected
+                        ? 'bg-blue-600/20 border-blue-500 text-white font-bold shadow-md'
+                        : 'bg-black/30 border-white/5 text-slate-300 hover:bg-white/5'
+                    }`}
+                  >
+                    <div className="truncate pr-2">
+                      <div className="truncate font-semibold uppercase">{e.name}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">{e.clientName || 'Client'} • {e.eventDate}</div>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 shrink-0 ${isSelected ? 'text-blue-400' : 'text-slate-600'}`} />
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
 
-        {/* Media Distribution */}
-        <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-2xl shadow-xl flex flex-col justify-between">
+        {/* Center: Monthly Comparison Chart */}
+        <div className="lg:col-span-6 p-6 rounded-3xl bg-slate-900/80 border border-white/15 backdrop-blur-2xl shadow-2xl flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-blue-400" />
-              <span>Budget par Média</span>
+              <span>Suivi Mensuel : Budget Engagé vs Payé</span>
             </h3>
-            <span className="text-[10px] font-mono text-slate-400">USD</span>
+            <span className="text-[10px] font-mono text-slate-400">Devise: USD $</span>
           </div>
-          <ReactECharts option={mediaChartOption} style={{ height: '260px' }} />
+          <ReactECharts option={monthlyChartOption} style={{ height: '320px' }} />
         </div>
 
-        {/* Region Breakdown */}
-        <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-2xl shadow-xl flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-blue-400" />
-              <span>Répartition par Région</span>
+        {/* Right: Selected Event Info Card */}
+        <div className="lg:col-span-3 p-6 rounded-3xl bg-slate-900/90 border border-white/20 shadow-2xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] text-blue-400 font-extrabold uppercase tracking-widest">
+                Fiche Campagne Événement
+              </span>
+              {activeEventDetail && (
+                <button
+                  onClick={() => setIsEditEventModalOpen(true)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/20 transition-all flex items-center gap-1 text-[10px] font-bold"
+                  title="Modifier cet événement"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                  <span>Modifier</span>
+                </button>
+              )}
+            </div>
+            <h3 className="text-base font-extrabold text-white uppercase tracking-tight mb-2">
+              {activeEventDetail?.name || 'Aucun Événement'}
             </h3>
-            <span className="text-[10px] font-mono text-slate-400">Zones RDC</span>
+            <div className="text-xs text-slate-300 font-medium mb-4 pb-3 border-b border-white/10">
+              Client : <span className="text-white font-bold">{activeEventDetail?.clientName || 'Inconnu'}</span>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Médias Engagés</span>
+                <span className="font-mono font-bold text-white">{activeEventMetrics.mediaCount}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Payé Médias</span>
+                <span className="font-mono font-bold text-emerald-400">
+                  ${activeEventMetrics.paid.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Pending Médias</span>
+                <span className="font-mono font-bold text-amber-400">
+                  ${activeEventMetrics.pending.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <div className="pt-3 border-t border-white/10 flex items-center justify-between text-sm font-black">
+                <span className="text-slate-200">Total Engagé</span>
+                <span className="font-mono text-white">
+                  ${activeEventMetrics.total.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
           </div>
-          <ReactECharts option={regionChartOption} style={{ height: '260px' }} />
+
+          <div className="mt-4 p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-300 flex items-center gap-2">
+            <Info className="w-4 h-4 text-blue-400 shrink-0" />
+            <span>Statut : {activeEventDetail?.status || 'En cours'}</span>
+          </div>
         </div>
       </div>
 
-      {/* Advanced ECharts Visualizations: Sunburst, Radar, Heatmap, Treemap */}
+      {/* LOWER ANALYTICS ROW: Client Breakdown Donut & Top Media Partners */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sunburst Hierarchy */}
-        <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-2xl shadow-xl">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Layers className="w-4 h-4 text-blue-400" />
-                <span>Arborescence Sunburst (Client → Événement → Média)</span>
-              </h3>
-              <p className="text-[11px] text-slate-400">Drilldown interactif de la structure budgétaire</p>
-            </div>
+        <div className="p-6 rounded-3xl bg-slate-900/80 border border-white/15 backdrop-blur-2xl shadow-2xl">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <PieChart className="w-4 h-4 text-blue-400" />
+              <span>Répartition des Budgets par Client</span>
+            </h3>
+            <span className="text-[10px] font-mono text-slate-400">Parts de Marché</span>
           </div>
-          <ReactECharts option={sunburstOption} style={{ height: '320px' }} />
+          <ReactECharts option={clientChartOption} style={{ height: '280px' }} />
         </div>
 
-        {/* Radar Chart */}
-        <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-2xl shadow-xl">
+        <div className="p-6 rounded-3xl bg-slate-900/80 border border-white/15 backdrop-blur-2xl shadow-2xl flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Grid className="w-4 h-4 text-emerald-400" />
-                <span>Radar des Types de Média</span>
-              </h3>
-              <p className="text-[11px] text-slate-400">Mix Média: TV, Radio, Presse, Digital & OOH</p>
-            </div>
+            <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <Tv className="w-4 h-4 text-purple-400" />
+              <span>Top Médias Partenaires BTL</span>
+            </h3>
+            <span className="text-[10px] font-mono text-slate-400">{medias.length} Médias Référencés</span>
           </div>
-          <ReactECharts option={radarOption} style={{ height: '320px' }} />
-        </div>
 
-        {/* Heatmap */}
-        <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-2xl shadow-xl">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Flame className="w-4 h-4 text-amber-400" />
-                <span>Heatmap des Dépenses Média / Mois</span>
-              </h3>
-              <p className="text-[11px] text-slate-400">Matrice d'intensité d'investissement</p>
-            </div>
-          </div>
-          <ReactECharts option={heatmapOption} style={{ height: '320px' }} />
-        </div>
+          <div className="space-y-2 overflow-y-auto max-h-[250px] pr-1">
+            {medias.slice(0, 8).map((m) => {
+              const totalForMedia = mediaByEvents
+                .filter((me) => me.mediaId === m.id)
+                .reduce((s, curr) => s + curr.amount, 0);
 
-        {/* Treemap */}
-        <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-2xl shadow-xl">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-purple-400" />
-                <span>Treemap Régions & Événements</span>
-              </h3>
-              <p className="text-[11px] text-slate-400">Proportions de volumes budgétaires</p>
-            </div>
+              return (
+                <div
+                  key={m.id}
+                  className="p-3 rounded-2xl bg-black/40 border border-white/5 flex items-center justify-between text-xs"
+                >
+                  <div>
+                    <div className="font-bold text-white">{m.name}</div>
+                    <div className="text-[10px] text-slate-400">{m.type} • {m.location}</div>
+                  </div>
+                  <div className="text-right font-mono font-bold text-blue-400">
+                    ${totalForMedia.toLocaleString('fr-FR')}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <ReactECharts option={treemapOption} style={{ height: '320px' }} />
         </div>
       </div>
+
+      {/* Modals */}
+      <PurchaseOrderModal
+        isOpen={isPoModalOpen}
+        onClose={() => setIsPoModalOpen(false)}
+      />
+
+      <AddPaymentModal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+      />
+
+      <EditEventModal
+        isOpen={isEditEventModalOpen}
+        onClose={() => setIsEditEventModalOpen(false)}
+        event={activeEventDetail}
+      />
     </div>
   );
 };

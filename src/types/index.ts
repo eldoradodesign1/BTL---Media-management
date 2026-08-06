@@ -169,3 +169,19 @@ export interface SavedView {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
+
+export interface PurchaseOrder {
+  id: string;
+  poNumber: string;
+  clientId: string;
+  clientName?: string;
+  amount: number;
+  supportAmount: number;
+  fpcPercent: number;
+  agencyFeesPercent: number;
+  poDate: string;
+  status: 'Actif' | 'Clôturé' | 'En attente';
+  notes?: string;
+  createdAt: string;
+}
+

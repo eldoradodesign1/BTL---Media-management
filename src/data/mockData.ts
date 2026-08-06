@@ -8,54 +8,57 @@ import {
   MediaByEvent,
   MediaPayment,
   User,
-  AuditLog
+  AuditLog,
+  PurchaseOrder
 } from '../types';
 
-export const initialUsers: User[] = [
+export const initialUsers: User[] = [];
+
+export const initialPurchaseOrders: PurchaseOrder[] = [
   {
-    id: 'u0',
-    name: 'Super Admin BTL',
-    email: 'superadmin@btl-agency.cd',
-    role: 'super-admin',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+    id: 'po-1',
+    poNumber: 'PO-2026-VODA-001',
+    clientId: 'cli-1',
+    clientName: 'Vodacom / Vodacash',
+    amount: 100000,
+    supportAmount: 4000,
+    fpcPercent: 5,
+    agencyFeesPercent: 14,
+    poDate: '2026-01-05',
+    status: 'Actif',
+    notes: 'PO Annuel Campagnes Médias Vodacom 2026',
+    createdAt: '2026-01-05T08:00:00Z'
   },
   {
-    id: 'u1',
-    name: 'Jean-Marc Kabanga',
-    email: 'j.kabanga@mediacampaign.com',
-    role: 'admin',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    id: 'po-2',
+    poNumber: 'PO-2026-AGAK-002',
+    clientId: 'cli-2',
+    clientName: 'Aga KHAN',
+    amount: 45000,
+    supportAmount: 1500,
+    fpcPercent: 5,
+    agencyFeesPercent: 14,
+    poDate: '2026-01-12',
+    status: 'Actif',
+    notes: 'Budget Campagne Santé Aga Khan',
+    createdAt: '2026-01-12T09:30:00Z'
   },
   {
-    id: 'u2',
-    name: 'Sophie Lumbala',
-    email: 's.lumbala@mediacampaign.com',
-    role: 'media_manager',
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'u3',
-    name: 'Alain Mukendi',
-    email: 'a.mukendi@mediacampaign.com',
-    role: 'finance',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'u4',
-    name: 'Clarisse Tshilombo',
-    email: 'c.tshilombo@mediacampaign.com',
-    role: 'auditor',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'u5',
-    name: 'Marc Tshiani (Client Vodacom)',
-    email: 'm.tshiani@vodacom.cd',
-    role: 'client',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    clientId: 'cli-1'
+    id: 'po-3',
+    poNumber: 'PO-2026-COCA-003',
+    clientId: 'cli-3',
+    clientName: 'The Coca-Cola Company',
+    amount: 80000,
+    supportAmount: 3000,
+    fpcPercent: 5,
+    agencyFeesPercent: 14,
+    poDate: '2026-02-01',
+    status: 'Actif',
+    notes: 'Lancement Produit Coca-Cola Zero RDC',
+    createdAt: '2026-02-01T10:15:00Z'
   }
 ];
+
 
 export const initialRegions: Region[] = [
   { id: 'reg-1', name: 'Kinshasa', code: 'KIN', createdAt: '2025-01-10' },

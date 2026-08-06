@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { CampaignEvent, EventStatus } from '../../types';
+import { EditEventModal } from '../modals/EditEventModal';
+import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
 import {
   Calendar,
   Plus,
@@ -21,9 +23,17 @@ interface EventsViewProps {
 }
 
 export const EventsView: React.FC<EventsViewProps> = ({ onOpenAddModal, onSelectEventForDiffusions }) => {
-  const { events, deleteEvent, globalSearchQuery, setActiveTab } = useApp();
+  const { events, deleteEvent, globalSearchQuery, setActiveTab, currentUser } = useApp();
 
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [editingEvent, setEditingEvent] = useState<CampaignEvent | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Deletion Safety Modal state
+  const [deletingEvent, setDeletingEvent] = useState<CampaignEvent | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  const isClient = currentUser?.role === 'client';
 
   const filteredEvents = events.filter((e) => {
     if (globalSearchQuery.trim()) {
@@ -164,13 +174,31 @@ export const EventsView: React.FC<EventsViewProps> = ({ onOpenAddModal, onSelect
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
 
-                <button
-                  onClick={() => deleteEvent(evt.id)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 transition-all"
-                  title="Supprimer cet événement"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {!isClient && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setEditingEvent(evt);
+                        setIsEditModalOpen(true);
+                      }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/20 transition-all"
+                      title="Modifier cet événement (changer de client, date, etc.)"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setDeletingEvent(evt);
+                        setIsDeleteModalOpen(true);
+                      }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 transition-all"
+                      title="Supprimer cet événement"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -182,6 +210,31 @@ export const EventsView: React.FC<EventsViewProps> = ({ onOpenAddModal, onSelect
           </div>
         )}
       </div>
+
+      <EditEventModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingEvent(null);
+        }}
+        event={editingEvent}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeletingEvent(null);
+        }}
+        onConfirm={() => {
+          if (deletingEvent) {
+            deleteEvent(deletingEvent.id);
+          }
+        }}
+        title="Supprimer l'Événement"
+        message={`Êtes-vous sûr de vouloir supprimer l'événement "${deletingEvent?.name}" ? Cette action supprimera également les diffusions et calculs de dépenses associés.`}
+        confirmText="Oui, Supprimer"
+      />
     </div>
   );
 };

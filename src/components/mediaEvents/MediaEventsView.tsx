@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MediaByEvent, ExpenseType } from '../../types';
 import { NumberWheelInput } from '../common/NumberWheelInput';
+import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
 import {
   Tv,
   Search,
@@ -34,12 +35,18 @@ export const MediaEventsView: React.FC<MediaEventsViewProps> = ({ onOpenAddModal
     medias,
     clients,
     pricingRates,
+    currentUser,
   } = useApp();
 
   const [filterClient, setFilterClient] = useState<string>('all');
   const [filterExpenseType, setFilterExpenseType] = useState<string>('all');
   const [filterPodState, setFilterPodState] = useState<string>('all');
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
+
+  const [deletingRow, setDeletingRow] = useState<MediaByEvent | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  const isClient = currentUser?.role === 'client';
 
   // Filtered dataset
   const filteredList = useMemo(() => {
@@ -99,15 +106,17 @@ export const MediaEventsView: React.FC<MediaEventsViewProps> = ({ onOpenAddModal
           </p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          <button
-            onClick={onOpenAddModal}
-            className="px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-2xl text-xs transition-all flex items-center gap-2 shadow-lg shadow-cyan-500/25"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nouvelle Diffusion Média</span>
-          </button>
-        </div>
+        {!isClient && (
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={onOpenAddModal}
+              className="px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-2xl text-xs transition-all flex items-center gap-2 shadow-lg shadow-cyan-500/25"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Nouvelle Diffusion Média</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filter Bar */}
@@ -262,23 +271,29 @@ export const MediaEventsView: React.FC<MediaEventsViewProps> = ({ onOpenAddModal
 
                     {/* Expense Type */}
                     <td className="py-3 px-4">
-                      <button
-                        onClick={() => handleToggleExpenseType(row)}
-                        title="Basculez entre Transport (frais fixes du média) et Tarif Média (barème client)"
-                        className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold border transition-all ${
-                          row.expenseType === 'Transport'
-                            ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 hover:bg-purple-500/30'
-                            : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/30'
-                        }`}
-                      >
-                        {row.expenseType}
-                      </button>
+                      {isClient ? (
+                        <span className="px-2.5 py-1 rounded-xl text-[11px] font-semibold border bg-cyan-500/10 text-cyan-300 border-cyan-500/30">
+                          {row.expenseType}
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleExpenseType(row)}
+                          title="Basculez entre Transport (frais fixes du média) et Tarif Média (barème client)"
+                          className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold border transition-all ${
+                            row.expenseType === 'Transport'
+                              ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 hover:bg-purple-500/30'
+                              : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/30'
+                          }`}
+                        >
+                          {row.expenseType}
+                        </button>
+                      )}
                     </td>
 
                     {/* Amount (Auto Calculated) */}
                     <td className="py-3 px-4 text-right">
-                      {isPodMissing ? (
-                        <span className="font-mono text-slate-500 font-bold">$0.00</span>
+                      {isPodMissing || isClient ? (
+                        <span className="font-mono text-slate-200 font-bold">${row.amount.toLocaleString('fr-FR')}</span>
                       ) : (
                         <NumberWheelInput
                           value={row.amount}
@@ -305,24 +320,29 @@ export const MediaEventsView: React.FC<MediaEventsViewProps> = ({ onOpenAddModal
                     </td>
 
                     {/* Actions */}
-                    <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => deleteMediaByEvent(row.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 transition-all"
-                          title="Supprimer cette ligne"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+                    {!isClient && (
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => {
+                              setDeletingRow(row);
+                              setIsDeleteModalOpen(true);
+                            }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 transition-all"
+                            title="Supprimer cette ligne"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
 
               {filteredList.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400 text-sm">
+                  <td colSpan={isClient ? 8 : 9} className="py-12 text-center text-slate-400 text-sm">
                     Aucune ligne de diffusion média ne correspond aux critères sélectionnés.
                   </td>
                 </tr>
@@ -331,6 +351,22 @@ export const MediaEventsView: React.FC<MediaEventsViewProps> = ({ onOpenAddModal
           </table>
         </div>
       </div>
+
+      <ConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeletingRow(null);
+        }}
+        onConfirm={() => {
+          if (deletingRow) {
+            deleteMediaByEvent(deletingRow.id);
+          }
+        }}
+        title="Supprimer la Diffusion"
+        message={`Êtes-vous sûr de vouloir supprimer la diffusion de ${deletingRow?.mediaName} pour l'événement "${deletingRow?.eventName}" ?`}
+        confirmText="Oui, Supprimer"
+      />
     </div>
   );
 };

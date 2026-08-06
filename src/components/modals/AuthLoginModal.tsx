@@ -11,13 +11,17 @@ import {
   Eye,
   EyeOff,
   UserCheck,
-  Database
+  Database,
+  HelpCircle,
+  KeyRound,
+  ArrowLeft
 } from 'lucide-react';
 
 export const AuthLoginModal: React.FC = () => {
   const {
     users,
     login,
+    requestPasswordReset,
     isAuthModalOpen,
     setIsAuthModalOpen,
     currentUser,
@@ -25,16 +29,29 @@ export const AuthLoginModal: React.FC = () => {
   } = useApp();
 
   const [selectedEmail, setSelectedEmail] = useState(currentUser?.email || users[0]?.email || '');
-  const [password, setPassword] = useState('123456');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Forgot Password Mode
+  const [isForgotMode, setIsForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState(selectedEmail);
+  const [forgotReason, setForgotReason] = useState('');
 
   if (!isAuthModalOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setSuccessMsg('');
+
+    if (!password) {
+      setErrorMsg('Veuillez saisir votre mot de passe.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -51,10 +68,29 @@ export const AuthLoginModal: React.FC = () => {
     }
   };
 
+  const handleForgotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+    setIsSubmitting(true);
+
+    try {
+      const res = await requestPasswordReset(forgotEmail, forgotReason);
+      setSuccessMsg(res.message || 'Votre demande a bien été transmise au SuperAdmin.');
+      setForgotReason('');
+    } catch (err: any) {
+      setErrorMsg('Erreur lors de l\'envoi de la demande.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSelectUser = (u: typeof users[0]) => {
     setSelectedEmail(u.email);
-    setPassword(u.password || '123456');
+    setForgotEmail(u.email);
+    setPassword(''); // DO NOT autofill password
     setErrorMsg('');
+    setSuccessMsg('');
   };
 
   return (
@@ -67,14 +103,16 @@ export const AuthLoginModal: React.FC = () => {
         {/* Modal Header */}
         <div className="p-8 pb-6 border-b border-white/10 text-center relative z-10">
           <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-tr from-blue-600 to-sky-400 flex items-center justify-center text-white shadow-xl shadow-blue-500/30 ring-2 ring-white/20">
-            <Zap className="w-7 h-7 fill-current" />
+            {isForgotMode ? <KeyRound className="w-7 h-7" /> : <Zap className="w-7 h-7 fill-current" />}
           </div>
 
           <h2 className="text-xl font-black text-white tracking-tight flex items-center justify-center gap-2">
-            <span>Connexion & Authentification</span>
+            <span>{isForgotMode ? 'Mot de passe oublié ?' : 'Connexion & Authentification'}</span>
           </h2>
           <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-            Accédez aux données de campagne média synchronisées sur Supabase
+            {isForgotMode
+              ? 'Envoyez une requête au SuperAdmin pour réinitialiser ou obtenir votre mot de passe'
+              : 'Saisissez vos identifiants sécurisés enregistrés sur Supabase'}
           </p>
 
           {isSupabaseConnected ? (
@@ -99,11 +137,18 @@ export const AuthLoginModal: React.FC = () => {
             </div>
           )}
 
+          {successMsg && (
+            <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
           {/* Quick Select Supabase User */}
           {users.length > 0 && (
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                Sélectionner un compte enregistré dans Supabase :
+                Sélectionner votre compte enregistré :
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
                 {users.map((u) => {
@@ -137,72 +182,142 @@ export const AuthLoginModal: React.FC = () => {
             </div>
           )}
 
-          {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Adresse Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                <input
-                  type="email"
-                  required
-                  value={selectedEmail}
-                  onChange={(e) => setSelectedEmail(e.target.value)}
-                  placeholder="nom@exemple.com"
-                  className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-950 border border-white/15 text-xs text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-semibold text-slate-300">
-                  Mot de passe
+          {!isForgotMode ? (
+            /* Standard Login Form */
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Adresse Email
                 </label>
-                <span className="text-[10px] text-slate-400">
-                  Par défaut : <code className="px-1 bg-white/10 rounded">123456</code>
-                </span>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+                  <input
+                    type="email"
+                    required
+                    value={selectedEmail}
+                    onChange={(e) => {
+                      setSelectedEmail(e.target.value);
+                      setForgotEmail(e.target.value);
+                    }}
+                    placeholder="nom@exemple.com"
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-950 border border-white/15 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
               </div>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Saisissez votre mot de passe"
-                  className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-950 border border-white/15 text-xs text-white focus:outline-none focus:border-blue-500"
-                />
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-300">
+                    Mot de passe
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsForgotMode(true);
+                      setErrorMsg('');
+                      setSuccessMsg('');
+                    }}
+                    className="text-[11px] text-blue-400 hover:text-blue-300 underline"
+                  >
+                    Mot de passe oublié ?
+                  </button>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Saisissez votre mot de passe"
+                    className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-950 border border-white/15 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-3 text-slate-500 hover:text-slate-300"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2">
                 <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-slate-500 hover:text-slate-300"
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white text-xs font-extrabold transition-all shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <span>Se Connecter à l'Application</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
-            </div>
+            </form>
+          ) : (
+            /* Forgot Password Request Form */
+            <form onSubmit={handleForgotSubmit} className="space-y-4 animate-fade-in">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Votre Adresse Email
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+                  <input
+                    type="email"
+                    required
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="nom@exemple.com"
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-950 border border-white/15 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
 
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white text-xs font-extrabold transition-all shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2"
-              >
-                <span>Se Connecter à l'Application</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </form>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Motif / Message au SuperAdmin (optionnel)
+                </label>
+                <textarea
+                  rows={2}
+                  value={forgotReason}
+                  onChange={(e) => setForgotReason(e.target.value)}
+                  placeholder="Expliquez brièvement votre demande (ex: oubli, premier accès...)"
+                  className="w-full p-3 rounded-xl bg-slate-950 border border-white/15 text-xs text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsForgotMode(false);
+                    setErrorMsg('');
+                    setSuccessMsg('');
+                  }}
+                  className="px-4 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Retour</span>
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 text-xs font-extrabold transition-all shadow-xl shadow-amber-500/25 flex items-center justify-center gap-2"
+                >
+                  <span>Envoyer la Demande au SuperAdmin</span>
+                  <HelpCircle className="w-4 h-4" />
+                </button>
+              </div>
+            </form>
+          )}
         </div>
 
         {/* Modal Footer */}
         <div className="p-4 bg-slate-950/80 border-t border-white/10 text-center text-[11px] text-slate-400 flex items-center justify-between px-6">
           <span className="flex items-center gap-1">
             <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-            Session protégée
+            Session protégée par mot de passe
           </span>
           <button
             onClick={() => setIsAuthModalOpen(false)}

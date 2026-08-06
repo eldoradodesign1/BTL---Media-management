@@ -8,7 +8,11 @@ import {
   CampaignEvent,
   MediaByEvent,
   MediaPayment,
-  AuditLog
+  AuditLog,
+  PurchaseOrder,
+  User,
+  UserRole,
+  RateType
 } from '../types';
 
 /**
@@ -117,6 +121,7 @@ export const supabaseService = {
         { data: events, error: errEvt },
         { data: mediaEvents, error: errMe },
         { data: mediaPayments, error: errPay },
+        { data: purchaseOrders, error: errPo },
         { data: auditLogs, error: errAud },
         { data: users, error: errUsr },
         { data: roles, error: errRol }
@@ -129,6 +134,7 @@ export const supabaseService = {
         supabase.from('events').select('*'),
         supabase.from('media_events').select('*'),
         supabase.from('media_payments').select('*'),
+        supabase.from('purchase_orders').select('*'),
         supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100),
         supabase.from('users').select('*'),
         supabase.from('roles').select('*')
@@ -153,13 +159,30 @@ export const supabaseService = {
         const rawCode = (roleObj?.code || u.role_code || u.role || 'ADMIN').toUpperCase();
         const role: UserRole = roleCodeMap[rawCode] || (rawCode.toLowerCase().replace('_', '-') as UserRole) || 'admin';
 
+        let clientId = u.client_id || undefined;
+        if (!clientId && role === 'client' && clients) {
+          const uName = (u.full_name || u.name || '').toLowerCase();
+          const uEmail = (u.email || '').toLowerCase();
+          const matchedCli = clients.find((c: any) => {
+            const cName = (c.name || '').toLowerCase();
+            const cEmail = (c.email || '').toLowerCase();
+            return (
+              (cName && uName && (cName.includes(uName) || uName.includes(cName))) ||
+              (cEmail && uEmail && cEmail === uEmail)
+            );
+          });
+          if (matchedCli) {
+            clientId = matchedCli.id;
+          }
+        }
+
         return {
           id: u.id,
           name: u.full_name || u.name || u.email,
           email: u.email || '',
           role: role,
           avatar: u.avatar_url || u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(u.full_name || u.email)}`,
-          clientId: u.client_id || undefined,
+          clientId: clientId,
           password: u.password || '123456'
         };
       });
@@ -251,6 +274,20 @@ export const supabaseService = {
           notes: p.notes || '',
           createdAt: p.created_at || new Date().toISOString()
         })) as MediaPayment[] | undefined,
+
+        purchaseOrders: purchaseOrders?.map(po => ({
+          id: po.id,
+          poNumber: po.po_number,
+          clientId: po.client_id,
+          amount: Number(po.amount || 0),
+          supportAmount: Number(po.support_amount || 0),
+          fpcPercent: Number(po.fpc_percent || 5),
+          agencyFeesPercent: Number(po.agency_fees_percent || 14),
+          poDate: po.po_date || new Date().toISOString().split('T')[0],
+          status: po.status || 'Actif',
+          notes: po.notes || '',
+          createdAt: po.created_at || new Date().toISOString()
+        })) as PurchaseOrder[] | undefined,
 
         auditLogs: auditLogs?.map(a => ({
           id: a.id,
@@ -370,6 +407,28 @@ export const supabaseService = {
       code: r.code,
       created_at: r.createdAt
     });
+  },
+
+  // Save / Sync Purchase Order
+  async savePurchaseOrder(po: PurchaseOrder) {
+    await upsertWithFallback('purchase_orders', {
+      id: po.id,
+      po_number: po.poNumber,
+      client_id: po.clientId,
+      amount: po.amount,
+      support_amount: po.supportAmount,
+      fpc_percent: po.fpcPercent,
+      agency_fees_percent: po.agencyFeesPercent,
+      po_date: po.poDate,
+      status: po.status,
+      notes: po.notes || '',
+      created_at: po.createdAt
+    });
+  },
+
+  // Delete Purchase Order
+  async deletePurchaseOrder(id: string) {
+    await deleteWithFallback('purchase_orders', id);
   },
 
   // Save / Sync Focal Point

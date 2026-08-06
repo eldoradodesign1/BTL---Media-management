@@ -11,10 +11,11 @@ import {
   MediaByEvent,
   MediaPayment,
   AuditLog,
-  SavedView
+  SavedView,
+  PurchaseOrder,
+  RateType
 } from '../types';
 import {
-  initialUsers,
   initialRegions,
   initialClients,
   initialFocalPoints,
@@ -23,7 +24,8 @@ import {
   initialEvents,
   initialMediaByEvents,
   initialMediaPayments,
-  initialAuditLogs
+  initialAuditLogs,
+  initialPurchaseOrders
 } from '../data/mockData';
 import { supabaseService } from '../lib/supabaseService';
 import { getSupabaseConfig } from '../lib/supabase';
@@ -52,6 +54,7 @@ interface AppContextType {
   users: User[];
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  requestPasswordReset: (email: string, reason?: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
   updateUserProfile: (data: { name?: string; email?: string; avatar?: string; password?: string; clientId?: string }) => Promise<{ success: boolean; message?: string }>;
   isProfileModalOpen: boolean;
@@ -81,6 +84,7 @@ interface AppContextType {
   events: CampaignEvent[];
   mediaByEvents: MediaByEvent[];
   mediaPayments: MediaPayment[];
+  purchaseOrders: PurchaseOrder[];
   auditLogs: AuditLog[];
   savedViews: SavedView[];
 
@@ -94,6 +98,10 @@ interface AppContextType {
   pushAllDataToSupabase: () => Promise<boolean>;
 
   // CRUD Actions
+  addPurchaseOrder: (po: Omit<PurchaseOrder, 'id' | 'createdAt'>) => void;
+  updatePurchaseOrder: (po: PurchaseOrder) => void;
+  deletePurchaseOrder: (id: string) => void;
+
   addEvent: (evt: Omit<CampaignEvent, 'id' | 'createdAt'>) => void;
   updateEvent: (evt: CampaignEvent) => void;
   deleteEvent: (id: string) => void;
@@ -144,13 +152,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // User & Auth State
   const [users, setUsers] = useState<User[]>(() => {
     const saved = localStorage.getItem('mcm_users');
-    return saved ? JSON.parse(saved) : initialUsers;
+    if (saved) {
+      try {
+        const parsed: User[] = JSON.parse(saved);
+        const realOnly = parsed.filter(u => !u.id.startsWith('u0') && !u.id.startsWith('u1') && !u.id.startsWith('u2') && !u.id.startsWith('u3') && !u.id.startsWith('u4') && !u.id.startsWith('u5'));
+        if (realOnly.length > 0) return realOnly;
+      } catch (e) {
+        // ignore parse error
+      }
+    }
+    return [];
   });
 
   const [currentUser, setCurrentUser] = useState<User>(() => {
     const savedId = localStorage.getItem('mcm_authenticated_user_id');
-    const found = savedId ? initialUsers.find(u => u.id === savedId) : null;
-    return found || initialUsers[0];
+    const saved = localStorage.getItem('mcm_users');
+    let realUsers: User[] = [];
+    if (saved) {
+      try {
+        const parsed: User[] = JSON.parse(saved);
+        realUsers = parsed.filter(u => !u.id.startsWith('u0') && !u.id.startsWith('u1') && !u.id.startsWith('u2') && !u.id.startsWith('u3') && !u.id.startsWith('u4') && !u.id.startsWith('u5'));
+      } catch (e) {}
+    }
+
+    if (savedId && realUsers.length > 0) {
+      const found = realUsers.find(u => u.id === savedId);
+      if (found) return found;
+    }
+    if (realUsers.length > 0) return realUsers[0];
+
+    // Placeholder temporaire avant le chargement Supabase
+    return {
+      id: 'default-admin',
+      name: 'Administrateur Supabase',
+      email: 'admin@btl-agency.cd',
+      role: 'super-admin',
+      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin'
+    };
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -218,6 +256,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(() => {
+    if (isDbConfigured) return [];
+    const saved = localStorage.getItem('mcm_purchase_orders');
+    return saved ? JSON.parse(saved) : initialPurchaseOrders;
+  });
+
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
     if (isDbConfigured) return [];
     const saved = localStorage.getItem('mcm_audit');
@@ -242,6 +286,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
+  const logAuditAction = useCallback((action: AuditLog['action'], entityType: string, details: string, entityId?: string) => {
+    const newLog: AuditLog = {
+      id: 'log-' + Date.now(),
+      userId: currentUser?.id || 'sys',
+      userName: currentUser ? currentUser.name : 'Système',
+      action,
+      entityType,
+      entityId,
+      details,
+      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+    };
+    setAuditLogs((prev) => [newLog, ...prev]);
+    supabaseService.saveAuditLog(newLog);
+  }, [currentUser]);
+
   // Supabase Sync Methods
   const syncFromSupabase = useCallback(async (): Promise<boolean> => {
     const config = getSupabaseConfig();
@@ -258,15 +317,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setIsSupabaseConnected(true);
 
-    if (remoteData.users && remoteData.users.length > 0) {
+    if (remoteData.users !== undefined) {
       setUsers(remoteData.users);
       localStorage.setItem('mcm_users', JSON.stringify(remoteData.users));
 
-      // Sync active current user with updated remote profile if available
-      setCurrentUser(prevUser => {
-        const matched = remoteData.users!.find(u => u.id === prevUser.id || u.email === prevUser.email);
-        return matched || remoteData.users![0];
-      });
+      if (remoteData.users.length > 0) {
+        // Sync active current user with updated remote profile if available
+        setCurrentUser(prevUser => {
+          const matched = remoteData.users!.find(u => u.id === prevUser.id || (u.email && prevUser.email && u.email.toLowerCase() === prevUser.email.toLowerCase()));
+          return matched || remoteData.users![0];
+        });
+      }
     }
 
     setRegions(remoteData.regions || []);
@@ -277,6 +338,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setEvents(remoteData.events || []);
     setMediaByEvents(remoteData.mediaByEvents || []);
     setMediaPayments(remoteData.mediaPayments || []);
+    setPurchaseOrders(remoteData.purchaseOrders || []);
     setAuditLogs(remoteData.auditLogs || []);
 
     return true;
@@ -290,7 +352,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: 'Aucun utilisateur trouvé avec cette adresse email.' };
     }
     const expectedPass = matched.password || '123456';
-    if (pass !== expectedPass && pass !== '123456') {
+    if (pass !== expectedPass) {
       return { success: false, message: 'Mot de passe incorrect.' };
     }
 
@@ -304,6 +366,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     return { success: true };
   }, [users, addNotification]);
+
+  const requestPasswordReset = useCallback(async (email: string, reason?: string) => {
+    const targetEmail = email.trim().toLowerCase();
+    const matched = users.find(u => u.email.toLowerCase() === targetEmail);
+    const userName = matched ? matched.name : targetEmail;
+
+    addNotification({
+      type: 'warning',
+      title: '🔐 Demande de Réinitialisation Mdp',
+      message: `Requête de réinitialisation soumise pour ${userName}. Notification envoyée au SuperAdmin.`
+    });
+
+    logAuditAction('Modification', 'Sécurité', `Demande de réinitialisation de mot de passe par ${userName} (${targetEmail}). Motif: ${reason || 'Mot de passe oublié'}`);
+    return { success: true, message: 'Demande envoyée au SuperAdmin.' };
+  }, [users, addNotification, logAuditAction]);
 
   const logout = useCallback(() => {
     setIsAuthenticated(false);
@@ -372,21 +449,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     syncFromSupabase();
   }, [syncFromSupabase]);
-
-  const logAuditAction = useCallback((action: AuditLog['action'], entityType: string, details: string, entityId?: string) => {
-    const newLog: AuditLog = {
-      id: 'log-' + Date.now(),
-      userId: currentUser.id,
-      userName: currentUser.name,
-      action,
-      entityType,
-      entityId,
-      details,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-    };
-    setAuditLogs((prev) => [newLog, ...prev]);
-    supabaseService.saveAuditLog(newLog);
-  }, [currentUser]);
 
   // Recalculate Business Logic Rules Engine
   const recalculateAll = useCallback(() => {
@@ -481,9 +543,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('mcm_events', JSON.stringify(events));
       localStorage.setItem('mcm_media_events', JSON.stringify(mediaByEvents));
       localStorage.setItem('mcm_payments', JSON.stringify(mediaPayments));
+      localStorage.setItem('mcm_purchase_orders', JSON.stringify(purchaseOrders));
       localStorage.setItem('mcm_audit', JSON.stringify(auditLogs));
     }
-  }, [regions, clients, focalPoints, medias, pricingRates, events, mediaByEvents, mediaPayments, auditLogs]);
+  }, [regions, clients, focalPoints, medias, pricingRates, events, mediaByEvents, mediaPayments, purchaseOrders, auditLogs]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -513,6 +576,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // CRUD Implementations with Supabase Dual Sync
+  const addPurchaseOrder = (poData: Omit<PurchaseOrder, 'id' | 'createdAt'>) => {
+    const id = 'po-' + Date.now();
+    const targetClient = clients.find(c => c.id === poData.clientId);
+    const newPo: PurchaseOrder = {
+      ...poData,
+      id,
+      clientName: targetClient?.name || poData.clientName || 'Client',
+      createdAt: new Date().toISOString(),
+    };
+    setPurchaseOrders(prev => [newPo, ...prev]);
+    supabaseService.savePurchaseOrder(newPo);
+    logAuditAction('Création', 'Ordre de Paiement (PO)', `Ajout du PO ${newPo.poNumber} (${newPo.amount} $)`, id);
+    addNotification({ type: 'success', title: 'PO Reçu enregistré', message: `Le PO ${newPo.poNumber} ($${newPo.amount.toLocaleString()}) a été ajouté.` });
+  };
+
+  const updatePurchaseOrder = (po: PurchaseOrder) => {
+    const targetClient = clients.find(c => c.id === po.clientId);
+    const updatedPo = { ...po, clientName: targetClient?.name || po.clientName };
+    setPurchaseOrders(prev => prev.map(p => p.id === po.id ? updatedPo : p));
+    supabaseService.savePurchaseOrder(updatedPo);
+    logAuditAction('Modification', 'Ordre de Paiement (PO)', `Modification du PO ${updatedPo.poNumber}`, po.id);
+    addNotification({ type: 'info', title: 'PO mis à jour', message: `Les données du PO ${updatedPo.poNumber} ont été actualisées.` });
+  };
+
+  const deletePurchaseOrder = (id: string) => {
+    const target = purchaseOrders.find(p => p.id === id);
+    setPurchaseOrders(prev => prev.filter(p => p.id !== id));
+    supabaseService.deletePurchaseOrder(id);
+    logAuditAction('Suppression', 'Ordre de Paiement (PO)', `Suppression du PO ${target?.poNumber || id}`, id);
+    addNotification({ type: 'warning', title: 'PO supprimé', message: 'Le PO a été retiré.' });
+  };
+
   const addEvent = (evt: Omit<CampaignEvent, 'id' | 'createdAt'>) => {
     const id = 'evt-' + Date.now();
     const newEvt: CampaignEvent = {
@@ -703,6 +798,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setEvents(initialEvents);
     setMediaByEvents(initialMediaByEvents);
     setMediaPayments(initialMediaPayments);
+    setPurchaseOrders(initialPurchaseOrders);
     setAuditLogs(initialAuditLogs);
     localStorage.clear();
     addNotification({ type: 'warning', title: 'Réinitialisation', message: 'Les données d\'origine ont été restaurées.' });
@@ -719,6 +815,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         users,
         isAuthenticated,
         login,
+        requestPasswordReset,
         logout,
         updateUserProfile,
         isProfileModalOpen,
@@ -744,6 +841,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         events: computedEvents,
         mediaByEvents,
         mediaPayments,
+        purchaseOrders,
         auditLogs,
         savedViews,
         notifications,
@@ -751,6 +849,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         removeNotification,
         syncFromSupabase,
         pushAllDataToSupabase,
+        addPurchaseOrder,
+        updatePurchaseOrder,
+        deletePurchaseOrder,
         addEvent,
         updateEvent,
         deleteEvent,

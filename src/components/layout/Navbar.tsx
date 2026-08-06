@@ -113,20 +113,40 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
           <Save className="w-4 h-4 text-emerald-400" />
         </button>
 
-        {/* Supabase Status & Config Button */}
-        <button
-          onClick={() => setIsSupabaseModalOpen(true)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm border ${
-            isSupabaseConnected
-              ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/40 text-emerald-300'
-              : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/40 text-amber-300'
-          }`}
-          title="Gérer la connexion Supabase PostgreSQL"
-        >
-          <Database className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Supabase DB</span>
-          <span className={`w-2 h-2 rounded-full ${isSupabaseConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
-        </button>
+        {/* Supabase Status & Config Button (SuperAdmin Only) vs Standard Sync Button */}
+        {currentUser.role === 'super-admin' ? (
+          <button
+            onClick={() => setIsSupabaseModalOpen(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm border ${
+              isSupabaseConnected
+                ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/40 text-emerald-300'
+                : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/40 text-amber-300'
+            }`}
+            title="Gérer la connexion Supabase PostgreSQL (SuperAdmin)"
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Supabase DB</span>
+            <span className={`w-2 h-2 rounded-full ${isSupabaseConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+          </button>
+        ) : (
+          <button
+            onClick={async () => {
+              const ok = await useApp().syncFromSupabase();
+              if (ok) {
+                useApp().addNotification({
+                  type: 'success',
+                  title: 'Actualisation',
+                  message: 'Les données ont été synchronisées avec la base de données.'
+                });
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm border bg-slate-800/60 hover:bg-slate-800 border-white/15 text-slate-200"
+            title="Actualiser et synchroniser les données"
+          >
+            <Database className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Actualiser</span>
+          </button>
+        )}
 
         {/* Export Button */}
         <button
@@ -276,8 +296,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
                 </button>
               </div>
 
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-cyan-400 px-3 py-1 mt-2 border-t border-white/10">
-                Utilisateurs Supabase ({users.length})
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-cyan-400 px-3 py-1 mt-2 border-t border-white/10 flex items-center justify-between">
+                <span>Comptes enregistrés ({users.length})</span>
+                {currentUser.role !== 'super-admin' && (
+                  <span className="text-[9px] text-amber-400 font-normal">Mot de passe requis</span>
+                )}
               </div>
               <div className="space-y-1 mt-1 max-h-48 overflow-y-auto pr-1">
                 {users.map((u) => {
@@ -287,7 +310,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
                     <button
                       key={u.id}
                       onClick={() => {
-                        setCurrentUser(u);
+                        if (currentUser.role === 'super-admin') {
+                          setCurrentUser(u);
+                        } else {
+                          setIsAuthModalOpen(true);
+                        }
                         setIsUserMenuOpen(false);
                       }}
                       className={`w-full flex items-center justify-between p-2 rounded-xl text-xs transition-all text-left ${

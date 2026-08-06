@@ -48,9 +48,12 @@ ALTER TABLE pricing ADD CONSTRAINT unique_media_client_rate_type UNIQUE(media_id
 CREATE TABLE IF NOT EXISTS events (id VARCHAR(100) PRIMARY KEY, event_date DATE NOT NULL, name VARCHAR(200) NOT NULL, client_id VARCHAR(100) NOT NULL, region_id VARCHAR(100) NOT NULL, status VARCHAR(50) DEFAULT 'Planifié', notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS media_events (id VARCHAR(100) PRIMARY KEY, event_id VARCHAR(100) NOT NULL, media_id VARCHAR(100) NOT NULL, proof_of_diffusion TEXT, expense_type VARCHAR(50), updated_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS media_payments (id VARCHAR(100) PRIMARY KEY, payment_date DATE NOT NULL DEFAULT CURRENT_DATE, media_id VARCHAR(100) NOT NULL, event_id VARCHAR(100) NOT NULL, client_id VARCHAR(100), focal_point_id VARCHAR(100), amount NUMERIC(12, 2) NOT NULL, payment_method VARCHAR(50) NOT NULL, reference_no VARCHAR(100), notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS purchase_orders (id VARCHAR(100) PRIMARY KEY, po_number VARCHAR(100) NOT NULL, client_id VARCHAR(100) NOT NULL, amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00, support_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00, fpc_percent NUMERIC(5, 2) NOT NULL DEFAULT 5.00, agency_fees_percent NUMERIC(5, 2) NOT NULL DEFAULT 14.00, po_date DATE NOT NULL DEFAULT CURRENT_DATE, status VARCHAR(20) DEFAULT 'Actif', notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS audit_logs (id VARCHAR(100) PRIMARY KEY, user_id VARCHAR(100), user_name VARCHAR(150), action VARCHAR(50) NOT NULL, entity_type VARCHAR(50) NOT NULL, entity_id VARCHAR(100), details TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 
 -- Enable RLS and add public access policies
+ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE regions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE focal_points ENABLE ROW LEVEL SECURITY;
@@ -59,8 +62,13 @@ ALTER TABLE pricing ENABLE ROW LEVEL SECURITY;
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE media_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE media_payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Public Roles" ON roles;
+CREATE POLICY "Public Roles" ON roles FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public Users" ON users;
+CREATE POLICY "Public Users" ON users FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Public Regions" ON regions;
 CREATE POLICY "Public Regions" ON regions FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Public Clients" ON clients;
@@ -77,6 +85,8 @@ DROP POLICY IF EXISTS "Public MediaEvents" ON media_events;
 CREATE POLICY "Public MediaEvents" ON media_events FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Public Payments" ON media_payments;
 CREATE POLICY "Public Payments" ON media_payments FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public Purchase Orders" ON purchase_orders;
+CREATE POLICY "Public Purchase Orders" ON purchase_orders FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Public Audit" ON audit_logs;
 CREATE POLICY "Public Audit" ON audit_logs FOR ALL USING (true) WITH CHECK (true);
 `;

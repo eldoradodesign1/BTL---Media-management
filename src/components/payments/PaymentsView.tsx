@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MediaPayment } from '../../types';
+import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
 import {
   CreditCard,
   Plus,
@@ -20,7 +21,12 @@ interface PaymentsViewProps {
 }
 
 export const PaymentsView: React.FC<PaymentsViewProps> = ({ onOpenAddModal }) => {
-  const { mediaPayments, deleteMediaPayment, globalSearchQuery } = useApp();
+  const { mediaPayments, deleteMediaPayment, globalSearchQuery, currentUser } = useApp();
+
+  const [deletingPayment, setDeletingPayment] = useState<MediaPayment | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  const isClient = currentUser?.role === 'client';
 
   const filteredPayments = mediaPayments.filter((p) => {
     if (globalSearchQuery.trim()) {
@@ -60,13 +66,15 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ onOpenAddModal }) =>
             </div>
           </div>
 
-          <button
-            onClick={onOpenAddModal}
-            className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold rounded-2xl text-xs transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/25"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Enregistrer un Paiement</span>
-          </button>
+          {!isClient && (
+            <button
+              onClick={onOpenAddModal}
+              className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold rounded-2xl text-xs transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/25"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Enregistrer un Paiement</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -82,7 +90,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ onOpenAddModal }) =>
                 <th className="py-3.5 px-4">Client</th>
                 <th className="py-3.5 px-4">Mode de Règlement</th>
                 <th className="py-3.5 px-4 text-right">Montant Versé ($)</th>
-                <th className="py-3.5 px-4 text-center">Actions</th>
+                {!isClient && <th className="py-3.5 px-4 text-center">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-xs">
@@ -133,21 +141,26 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ onOpenAddModal }) =>
                   </td>
 
                   {/* Actions */}
-                  <td className="py-3 px-4 text-center">
-                    <button
-                      onClick={() => deleteMediaPayment(pay.id)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 transition-all"
-                      title="Annuler/Supprimer ce paiement"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
+                  {!isClient && (
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        onClick={() => {
+                          setDeletingPayment(pay);
+                          setIsDeleteModalOpen(true);
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 transition-all"
+                        title="Annuler/Supprimer ce paiement"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
 
               {filteredPayments.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400 text-sm">
+                  <td colSpan={isClient ? 6 : 7} className="py-12 text-center text-slate-400 text-sm">
                     Aucun paiement enregistré dans le registre.
                   </td>
                 </tr>
@@ -156,6 +169,22 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ onOpenAddModal }) =>
           </table>
         </div>
       </div>
+
+      <ConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeletingPayment(null);
+        }}
+        onConfirm={() => {
+          if (deletingPayment) {
+            deleteMediaPayment(deletingPayment.id);
+          }
+        }}
+        title="Supprimer le Paiement"
+        message={`Êtes-vous sûr de vouloir supprimer le paiement de $${deletingPayment?.amount.toLocaleString()} pour ${deletingPayment?.mediaName} (${deletingPayment?.referenceNo}) ?`}
+        confirmText="Oui, Supprimer"
+      />
     </div>
   );
 };

@@ -62,12 +62,29 @@ export const PricingMatrixView: React.FC = () => {
 
   // Filtered Clients
   const filteredClients = useMemo(() => {
-    if (isClient && currentUser.clientId) {
-      return clients.filter((c) => c.id === currentUser.clientId);
+    if (isClient) {
+      if (currentUser.clientId) {
+        const found = clients.filter((c) => c.id === currentUser.clientId);
+        if (found.length > 0) return found;
+      }
+      // Tentative d'association par nom de client
+      const matched = clients.filter((c) => {
+        const cName = (c.name || '').toLowerCase();
+        const uName = (currentUser.name || '').toLowerCase();
+        return (cName && uName && (cName.includes(uName) || uName.includes(cName)));
+      });
+      if (matched.length > 0) return matched;
+
+      // Fallback vers le filtre sélectionné ou tous les clients de la base
+      if (selectedClientFilter !== 'all') {
+        const filtered = clients.filter((c) => c.id === selectedClientFilter);
+        if (filtered.length > 0) return filtered;
+      }
+      return clients.length > 0 ? clients : [];
     }
     if (selectedClientFilter === 'all') return clients;
     return clients.filter((c) => c.id === selectedClientFilter);
-  }, [clients, selectedClientFilter, isClient, currentUser.clientId]);
+  }, [clients, selectedClientFilter, isClient, currentUser.clientId, currentUser.name]);
 
   // Filtered Rows for the Row View
   const rowViewData = useMemo(() => {
@@ -330,13 +347,19 @@ export const PricingMatrixView: React.FC = () => {
                     {filteredClients.map((cli) => {
                       const catalogObj = pricingRates.find(
                         (p) => p.mediaId === med.id && p.clientId === cli.id && (p.rateType === 'catalog' || !p.rateType)
-                      );
-                      const realObj = pricingRates.find(
-                        (p) => p.mediaId === med.id && p.clientId === cli.id && p.rateType === 'real'
+                      ) || pricingRates.find(
+                        (p) => p.mediaId === med.id && (p.rateType === 'catalog' || !p.rateType)
                       );
 
-                      const catalogRate = catalogObj ? catalogObj.rateAmount : 0;
-                      const realRate = realObj ? realObj.rateAmount : 0;
+                      const realObj = pricingRates.find(
+                        (p) => p.mediaId === med.id && p.clientId === cli.id && p.rateType === 'real'
+                      ) || pricingRates.find(
+                        (p) => p.mediaId === med.id && p.rateType === 'real'
+                      );
+
+                      const defaultCatalog = med.transportFee && med.transportFee > 0 ? med.transportFee * 5 : 1000;
+                      const catalogRate = catalogObj && catalogObj.rateAmount > 0 ? catalogObj.rateAmount : defaultCatalog;
+                      const realRate = realObj && realObj.rateAmount > 0 ? realObj.rateAmount : Math.round(catalogRate * 0.75);
                       const margin = catalogRate - realRate;
                       const marginPct = catalogRate > 0 ? ((margin / catalogRate) * 100).toFixed(0) : '0';
 
