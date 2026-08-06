@@ -306,29 +306,36 @@ export const MediasView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-xs">
-                {focalPoints.map((fp) => (
-                  <tr key={fp.id} className="hover:bg-cyan-500/10 transition-colors">
-                    <td className="py-3 px-4 font-bold text-white flex items-center gap-2">
-                      <User className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>{fp.name}</span>
-                    </td>
-                    <td className="py-3 px-4 text-slate-200 font-medium">{fp.mediaName || 'Global'}</td>
-                    <td className="py-3 px-4 text-slate-300">{fp.clientName || 'Tous'}</td>
-                    <td className="py-3 px-4 font-mono text-cyan-300 font-semibold">{fp.phone}</td>
-                    <td className="py-3 px-4 text-slate-400 font-mono">{fp.email}</td>
-                    {canManageMedia && (
-                      <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={() => handleOpenEditFocal(fp)}
-                          className="p-1 rounded-lg hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-300 transition-colors"
-                          title="Modifier le point focal"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
+                {focalPoints.map((fp) => {
+                  const matchedMedia = medias.find((m) => m.id === fp.mediaId);
+                  const matchedClient = clients.find((c) => c.id === fp.clientId);
+                  const displayMediaName = fp.mediaName || matchedMedia?.name || (fp.mediaId ? 'Média Inconnu' : 'Global');
+                  const displayClientName = fp.clientName || matchedClient?.name || (fp.clientId ? 'Client Inconnu' : 'Tous');
+
+                  return (
+                    <tr key={fp.id} className="hover:bg-cyan-500/10 transition-colors">
+                      <td className="py-3 px-4 font-bold text-white flex items-center gap-2">
+                        <User className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>{fp.name}</span>
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td className="py-3 px-4 text-slate-200 font-medium">{displayMediaName}</td>
+                      <td className="py-3 px-4 text-slate-300">{displayClientName}</td>
+                      <td className="py-3 px-4 font-mono text-cyan-300 font-semibold">{fp.phone}</td>
+                      <td className="py-3 px-4 text-slate-400 font-mono">{fp.email}</td>
+                      {canManageMedia && (
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            onClick={() => handleOpenEditFocal(fp)}
+                            className="p-1 rounded-lg hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-300 transition-colors"
+                            title="Modifier le point focal"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

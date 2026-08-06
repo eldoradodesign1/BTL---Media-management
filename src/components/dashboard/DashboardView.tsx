@@ -167,30 +167,147 @@ export const DashboardView: React.FC = () => {
     };
   }, [activeEventDetail, activeEventDiffusions]);
 
-  // 1. Monthly Bar Chart Option
-  const monthlyChartOption = useMemo(() => {
-    const months = ['JANV', 'FÉVR', 'MARS', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛT', 'SEPT', 'OCT', 'NOV', 'DÉC'];
-    const amountData = new Array(12).fill(0);
-    const paidData = new Array(12).fill(0);
+  // Chart type logic: Monthly breakdown only if selectedMonth === 'all' and no single event selected
+  const isMonthlyView = selectedMonth === 'all' && !selectedEventId;
 
-    filteredMediaEvents.forEach((m) => {
-      const dateStr = m.eventDate || events.find((e) => e.id === m.eventId)?.eventDate;
-      if (dateStr) {
-        const mIdx = new Date(dateStr).getMonth();
-        if (mIdx >= 0 && mIdx < 12) {
-          amountData[mIdx] += m.amount;
+  const handleChartClick = (params: any) => {
+    if (selectedMonth === 'all') {
+      const monthIndexMap: Record<string, string> = {
+        'JANV': '0', 'FÉVR': '1', 'MARS': '2', 'AVR': '3',
+        'MAI': '4', 'JUIN': '5', 'JUIL': '6', 'AOÛT': '7',
+        'SEPT': '8', 'OCT': '9', 'NOV': '10', 'DÉC': '11'
+      };
+      if (params && params.name) {
+        const nameUpper = String(params.name).toUpperCase();
+        if (monthIndexMap[nameUpper] !== undefined) {
+          setSelectedMonth(monthIndexMap[nameUpper]);
+          setSelectedEventId(null);
+        } else if (typeof params.dataIndex === 'number' && params.dataIndex >= 0 && params.dataIndex < 12) {
+          setSelectedMonth(params.dataIndex.toString());
+          setSelectedEventId(null);
         }
+      } else if (typeof params?.dataIndex === 'number' && params.dataIndex >= 0 && params.dataIndex < 12) {
+        setSelectedMonth(params.dataIndex.toString());
+        setSelectedEventId(null);
       }
+    }
+  };
+
+  // Main Bar Chart Option (Monthly OR Media Breakdown)
+  const mainChartOption = useMemo(() => {
+    if (isMonthlyView) {
+      const months = ['JANV', 'FÉVR', 'MARS', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛT', 'SEPT', 'OCT', 'NOV', 'DÉC'];
+      const amountData = new Array(12).fill(0);
+      const paidData = new Array(12).fill(0);
+
+      filteredMediaEvents.forEach((m) => {
+        const dateStr = m.eventDate || events.find((e) => e.id === m.eventId)?.eventDate;
+        if (dateStr) {
+          const mIdx = new Date(dateStr).getMonth();
+          if (mIdx >= 0 && mIdx < 12) {
+            amountData[mIdx] += m.amount;
+          }
+        }
+      });
+
+      filteredPayments.forEach((p) => {
+        if (p.paymentDate) {
+          const mIdx = new Date(p.paymentDate).getMonth();
+          if (mIdx >= 0 && mIdx < 12) {
+            paidData[mIdx] += p.amount;
+          }
+        }
+      });
+
+      return {
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+          borderColor: 'rgba(255, 255, 255, 0.15)',
+          textStyle: { color: '#f8fafc', fontSize: 11 },
+          formatter: (params: any[]) => {
+            let res = `<div class="font-bold border-b border-white/10 pb-1 mb-1 text-blue-300">${params[0].axisValue} (Cliquer pour filtrer)</div>`;
+            params.forEach((item) => {
+              res += `<div class="flex items-center justify-between gap-4 text-xs py-0.5">
+                <span>${item.marker} ${item.seriesName}:</span>
+                <span class="font-mono font-bold">$${item.value.toLocaleString('fr-FR')}</span>
+              </div>`;
+            });
+            return res;
+          }
+        },
+        legend: {
+          top: '0',
+          right: '10',
+          textStyle: { color: textColor, fontSize: 11 }
+        },
+        grid: { left: '3%', right: '3%', bottom: '10%', top: '18%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: months,
+          axisLabel: { color: textColor, fontSize: 10, fontWeight: 'bold' },
+          axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } }
+        },
+        yAxis: {
+          type: 'value',
+          axisLabel: { color: textColor, formatter: '${value}' },
+          splitLine: { lineStyle: { color: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' } }
+        },
+        series: [
+          {
+            name: 'Budget Engagé',
+            type: 'bar',
+            data: amountData,
+            itemStyle: {
+              color: '#60a5fa',
+              borderRadius: [6, 6, 0, 0]
+            }
+          },
+          {
+            name: 'Paiements Effectués',
+            type: 'bar',
+            data: paidData,
+            itemStyle: {
+              color: '#34d399',
+              borderRadius: [6, 6, 0, 0]
+            }
+          }
+        ]
+      };
+    }
+
+    // Media Breakdown View when a month or specific event is selected
+    let relevantDiffusions: typeof mediaByEvents = [];
+    if (selectedEventId) {
+      relevantDiffusions = mediaByEvents.filter((m) => m.eventId === selectedEventId);
+    } else if (activeEventDetail) {
+      relevantDiffusions = mediaByEvents.filter((m) => m.eventId === activeEventDetail.id);
+    } else {
+      const evtIds = new Set(filteredEvents.map((e) => e.id));
+      relevantDiffusions = mediaByEvents.filter((m) => evtIds.has(m.eventId));
+    }
+
+    const mediaMap: Record<string, { mediaName: string; amount: number; paid: number }> = {};
+
+    relevantDiffusions.forEach((m) => {
+      const mName = m.mediaName || medias.find((med) => med.id === m.mediaId)?.name || 'Média';
+      if (!mediaMap[mName]) {
+        mediaMap[mName] = { mediaName: mName, amount: 0, paid: 0 };
+      }
+      mediaMap[mName].amount += m.amount;
+      mediaMap[mName].paid += m.paid || 0;
     });
 
-    filteredPayments.forEach((p) => {
-      if (p.paymentDate) {
-        const mIdx = new Date(p.paymentDate).getMonth();
-        if (mIdx >= 0 && mIdx < 12) {
-          paidData[mIdx] += p.amount;
-        }
-      }
-    });
+    if (Object.keys(mediaMap).length === 0) {
+      medias.slice(0, 5).forEach((m) => {
+        mediaMap[m.name] = { mediaName: m.name, amount: 0, paid: 0 };
+      });
+    }
+
+    const finalCategories = Object.keys(mediaMap);
+    const amountData = finalCategories.map((k) => mediaMap[k].amount);
+    const paidData = finalCategories.map((k) => mediaMap[k].paid);
 
     return {
       tooltip: {
@@ -200,7 +317,7 @@ export const DashboardView: React.FC = () => {
         borderColor: 'rgba(255, 255, 255, 0.15)',
         textStyle: { color: '#f8fafc', fontSize: 11 },
         formatter: (params: any[]) => {
-          let res = `<div class="font-bold border-b border-white/10 pb-1 mb-1 text-blue-300">${params[0].axisValue}</div>`;
+          let res = `<div class="font-bold border-b border-white/10 pb-1 mb-1 text-cyan-300">${params[0].axisValue}</div>`;
           params.forEach((item) => {
             res += `<div class="flex items-center justify-between gap-4 text-xs py-0.5">
               <span>${item.marker} ${item.seriesName}:</span>
@@ -215,11 +332,11 @@ export const DashboardView: React.FC = () => {
         right: '10',
         textStyle: { color: textColor, fontSize: 11 }
       },
-      grid: { left: '3%', right: '3%', bottom: '10%', top: '18%', containLabel: true },
+      grid: { left: '3%', right: '3%', bottom: '18%', top: '18%', containLabel: true },
       xAxis: {
         type: 'category',
-        data: months,
-        axisLabel: { color: textColor, fontSize: 10, fontWeight: 'bold' },
+        data: finalCategories,
+        axisLabel: { color: textColor, fontSize: 10, fontWeight: 'bold', interval: 0, rotate: finalCategories.length > 3 ? 20 : 0 },
         axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } }
       },
       yAxis: {
@@ -229,26 +346,20 @@ export const DashboardView: React.FC = () => {
       },
       series: [
         {
-          name: 'Budget Engagé',
+          name: 'Budget Engagé Média',
           type: 'bar',
           data: amountData,
-          itemStyle: {
-            color: '#60a5fa',
-            borderRadius: [6, 6, 0, 0]
-          }
+          itemStyle: { color: '#60a5fa', borderRadius: [6, 6, 0, 0] }
         },
         {
           name: 'Paiements Effectués',
           type: 'bar',
           data: paidData,
-          itemStyle: {
-            color: '#34d399',
-            borderRadius: [6, 6, 0, 0]
-          }
+          itemStyle: { color: '#34d399', borderRadius: [6, 6, 0, 0] }
         }
       ]
     };
-  }, [filteredMediaEvents, filteredPayments, events, textColor, isDark]);
+  }, [isMonthlyView, filteredMediaEvents, filteredPayments, filteredEvents, mediaByEvents, events, medias, selectedEventId, activeEventDetail, textColor, isDark]);
 
   // 2. Client Breakdown Donut
   const clientChartOption = useMemo(() => {
@@ -455,7 +566,10 @@ export const DashboardView: React.FC = () => {
               </span>
               <div className="flex flex-wrap gap-1">
                 <button
-                  onClick={() => setSelectedMonth('all')}
+                  onClick={() => {
+                    setSelectedMonth('all');
+                    setSelectedEventId(null);
+                  }}
                   className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
                     selectedMonth === 'all'
                       ? 'bg-amber-500/30 text-amber-200 border border-amber-500/40 shadow-sm'
@@ -467,7 +581,10 @@ export const DashboardView: React.FC = () => {
                 {monthsList.map((m) => (
                   <button
                     key={m.value}
-                    onClick={() => setSelectedMonth(m.value)}
+                    onClick={() => {
+                      setSelectedMonth(m.value);
+                      setSelectedEventId(null);
+                    }}
                     className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold transition-all ${
                       selectedMonth === m.value
                         ? 'bg-amber-500 text-slate-950 font-bold'
@@ -525,16 +642,26 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
 
-        {/* Center: Monthly Comparison Chart */}
+        {/* Center: Main Comparison Chart (Monthly or Media Histogram) */}
         <div className="lg:col-span-6 p-6 rounded-3xl bg-slate-900/80 border border-white/15 backdrop-blur-2xl shadow-2xl flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-blue-400" />
-              <span>Suivi Mensuel : Budget Engagé vs Payé</span>
+              <BarChart3 className={`w-4 h-4 ${isMonthlyView ? 'text-blue-400' : 'text-cyan-400'}`} />
+              <span>
+                {isMonthlyView
+                  ? 'Suivi Mensuel : Budget Engagé vs Payé'
+                  : `Histogramme Médias : ${activeEventDetail ? activeEventDetail.name : 'Événements du Mois'}`}
+              </span>
             </h3>
             <span className="text-[10px] font-mono text-slate-400">Devise: USD $</span>
           </div>
-          <ReactECharts option={monthlyChartOption} style={{ height: '320px' }} />
+          <ReactECharts
+            option={mainChartOption}
+            style={{ height: '320px' }}
+            onEvents={{
+              click: handleChartClick
+            }}
+          />
         </div>
 
         {/* Right: Selected Event Info Card */}

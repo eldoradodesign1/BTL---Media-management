@@ -257,14 +257,20 @@ export const supabaseService = {
           createdAt: c.created_at || new Date().toISOString()
         })) as Client[] | undefined,
 
-        focalPoints: focalPoints?.map(f => ({
-          id: f.id,
-          name: f.name,
-          phone: f.phone || '',
-          email: f.email || '',
-          mediaId: f.media_id || '',
-          clientId: f.client_id || ''
-        })) as FocalPoint[] | undefined,
+        focalPoints: focalPoints?.map(f => {
+          const m = medias?.find((mItem: any) => mItem.id === f.media_id);
+          const c = clients?.find((cItem: any) => cItem.id === f.client_id);
+          return {
+            id: f.id,
+            name: f.name,
+            phone: f.phone || '',
+            email: f.email || '',
+            mediaId: f.media_id || '',
+            mediaName: f.media_name || m?.name || '',
+            clientId: f.client_id || '',
+            clientName: f.client_name || c?.name || ''
+          };
+        }) as FocalPoint[] | undefined,
 
         medias: medias?.map(m => ({
           id: m.id,
