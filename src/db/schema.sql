@@ -29,9 +29,15 @@ CREATE TABLE IF NOT EXISTS users (
   full_name VARCHAR(150) NOT NULL,
   role_id UUID REFERENCES roles(id) ON DELETE SET NULL,
   avatar_url TEXT,
+  client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
+  password VARCHAR(255) DEFAULT '123456',
   status VARCHAR(20) DEFAULT 'active',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Commandes de migration pour bases existantes :
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS password VARCHAR(255) DEFAULT '123456';
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS client_id UUID;
 
 -- 3. REGIONS
 CREATE TABLE IF NOT EXISTS regions (
@@ -98,16 +104,24 @@ CREATE TABLE IF NOT EXISTS pricing (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   media_id UUID NOT NULL REFERENCES medias(id) ON DELETE CASCADE,
   client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  rate_type VARCHAR(20) NOT NULL DEFAULT 'catalog', -- 'catalog' (client) ou 'real' (btl)
   rate_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
   effective_date DATE DEFAULT CURRENT_DATE,
   version INT DEFAULT 1,
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  CONSTRAINT unique_media_client_pricing UNIQUE(media_id, client_id)
+  CONSTRAINT unique_media_client_rate_type UNIQUE(media_id, client_id, rate_type)
 );
+
+-- Commandes de migration pour bases existantes :
+-- ALTER TABLE pricing ADD COLUMN IF NOT EXISTS rate_type VARCHAR(20) NOT NULL DEFAULT 'catalog';
+-- ALTER TABLE pricing DROP CONSTRAINT IF EXISTS unique_media_client_pricing;
+-- ALTER TABLE pricing DROP CONSTRAINT IF EXISTS unique_media_client_rate_type;
+-- ALTER TABLE pricing ADD CONSTRAINT unique_media_client_rate_type UNIQUE(media_id, client_id, rate_type);
 
 CREATE TABLE IF NOT EXISTS pricing_versions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   pricing_id UUID NOT NULL REFERENCES pricing(id) ON DELETE CASCADE,
+  rate_type VARCHAR(20) DEFAULT 'catalog',
   rate_amount NUMERIC(12, 2) NOT NULL,
   version INT NOT NULL,
   changed_by UUID REFERENCES users(id),
@@ -140,7 +154,10 @@ CREATE TABLE IF NOT EXISTS media_events (
       ELSE COALESCE(
         (SELECT rate_amount FROM pricing p 
          JOIN events e ON e.id = event_id 
-         WHERE p.media_id = media_events.media_id AND p.client_id = e.client_id LIMIT 1),
+         WHERE p.media_id = media_events.media_id 
+           AND p.client_id = e.client_id 
+           AND (p.rate_type = 'catalog' OR p.rate_type IS NULL)
+         LIMIT 1),
         0.00
       )
     END

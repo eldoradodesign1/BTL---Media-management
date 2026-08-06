@@ -1,6 +1,6 @@
 export type AppTheme = 'dark' | 'light' | 'classic';
 
-export type UserRole = 'admin' | 'media_manager' | 'finance' | 'auditor';
+export type UserRole = 'super-admin' | 'admin' | 'media_manager' | 'finance' | 'auditor' | 'client';
 
 export interface User {
   id: string;
@@ -8,6 +8,8 @@ export interface User {
   email: string;
   role: UserRole;
   avatar: string;
+  clientId?: string;
+  password?: string;
 }
 
 export interface Region {
@@ -52,10 +54,13 @@ export interface FocalPoint {
   email: string;
 }
 
+export type RateType = 'catalog' | 'real';
+
 export interface PricingRate {
   id: string;
   mediaId: string;
   clientId: string;
+  rateType: RateType; // 'catalog' (Prix Catalogue Client) or 'real' (Prix Réel / Coût BTL)
   rateAmount: number;
   effectiveDate: string;
   version: number;
@@ -93,7 +98,8 @@ export interface MediaByEvent {
   proofOfDiffusion: string; // empty string means unverified / zero amount
   podLinks: string[]; // URLs or attachment paths
   expenseType: ExpenseType;
-  amount: number; // auto-calculated
+  amount: number; // Prix Catalogue Client (Facturé)
+  costAmount?: number; // Prix Réel BTL (Coût interne)
   paid: number; // auto-calculated from payments
   pending: number; // auto-calculated amount - paid
   focalPointName?: string;

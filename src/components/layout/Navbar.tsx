@@ -13,7 +13,11 @@ import {
   ChevronDown,
   Check,
   Save,
-  Download
+  Download,
+  Database,
+  User as UserIcon,
+  LogOut,
+  KeyRound
 } from 'lucide-react';
 import { UserRole } from '../../types';
 
@@ -32,8 +36,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
     setGlobalSearchQuery,
     setIsCommandPaletteOpen,
     setIsShortcutsModalOpen,
+    setIsSupabaseModalOpen,
+    isSupabaseConnected,
     notifications,
     triggerManualSave,
+    setIsProfileModalOpen,
+    setIsAuthModalOpen,
+    logout,
   } = useApp();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -41,14 +50,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
 
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
+      case 'super-admin':
+        return { label: 'Super Admin', color: 'bg-purple-500/25 text-purple-300 border-purple-500/40' };
       case 'admin':
         return { label: 'Admin Général', color: 'bg-rose-500/20 text-rose-300 border-rose-500/30' };
       case 'media_manager':
-        return { label: 'Resp. Média', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' };
+        return { label: 'Resp. Média BTL', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' };
       case 'finance':
-        return { label: 'Resp. Finance', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' };
+        return { label: 'Resp. Finance BTL', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' };
       case 'auditor':
         return { label: 'Auditeur (Lecture)', color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' };
+      case 'client':
+        return { label: 'Utilisateur Client', color: 'bg-sky-500/20 text-sky-300 border-sky-500/30' };
+      default:
+        return { label: 'Utilisateur', color: 'bg-slate-500/20 text-slate-300 border-slate-500/30' };
     }
   };
 
@@ -98,10 +113,25 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
           <Save className="w-4 h-4 text-emerald-400" />
         </button>
 
+        {/* Supabase Status & Config Button */}
+        <button
+          onClick={() => setIsSupabaseModalOpen(true)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm border ${
+            isSupabaseConnected
+              ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/40 text-emerald-300'
+              : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/40 text-amber-300'
+          }`}
+          title="Gérer la connexion Supabase PostgreSQL"
+        >
+          <Database className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Supabase DB</span>
+          <span className={`w-2 h-2 rounded-full ${isSupabaseConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+        </button>
+
         {/* Export Button */}
         <button
           onClick={onOpenExportModal}
-          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 rounded-xl text-xs font-semibold transition-all shadow-sm"
+          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 rounded-xl text-xs font-semibold transition-all shadow-sm"
         >
           <Download className="w-3.5 h-3.5" />
           <span>Export Excel/PDF</span>
@@ -208,11 +238,48 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
           </button>
 
           {isUserMenuOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-slate-900/95 border border-white/20 rounded-2xl shadow-2xl p-2 z-50 text-slate-200 backdrop-blur-2xl">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-cyan-400 px-3 py-1">
-                Changer d'utilisateur / Rôle
+            <div className="absolute right-0 mt-2 w-72 bg-slate-900/95 border border-white/20 rounded-2xl shadow-2xl p-2 z-50 text-slate-200 backdrop-blur-2xl">
+              {/* User Header Info */}
+              <div className="p-3 mb-2 rounded-xl bg-white/5 border border-white/10 flex items-center gap-3">
+                <img src={currentUser.avatar} alt={currentUser.name} className="w-10 h-10 rounded-xl object-cover ring-1 ring-blue-400" referrerPolicy="no-referrer" />
+                <div className="overflow-hidden">
+                  <div className="font-bold text-white text-xs truncate">{currentUser.name}</div>
+                  <div className="text-[10px] text-slate-400 truncate">{currentUser.email}</div>
+                  <span className={`inline-block mt-1 px-1.5 py-0.2 text-[9px] font-bold rounded border ${roleInfo.color}`}>
+                    {roleInfo.label}
+                  </span>
+                </div>
               </div>
-              <div className="space-y-1 mt-1">
+
+              {/* Action Buttons */}
+              <div className="space-y-1 mb-2">
+                <button
+                  onClick={() => {
+                    setIsProfileModalOpen(true);
+                    setIsUserMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold border border-blue-500/30 transition-all text-left"
+                >
+                  <UserIcon className="w-4 h-4 text-blue-400" />
+                  <span>Mon Profil & Photo</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsAuthModalOpen(true);
+                    setIsUserMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-medium border border-white/10 transition-all text-left"
+                >
+                  <KeyRound className="w-4 h-4 text-emerald-400" />
+                  <span>Authentificateur / Connexion</span>
+                </button>
+              </div>
+
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-cyan-400 px-3 py-1 mt-2 border-t border-white/10">
+                Utilisateurs Supabase ({users.length})
+              </div>
+              <div className="space-y-1 mt-1 max-h-48 overflow-y-auto pr-1">
                 {users.map((u) => {
                   const badge = getRoleBadge(u.role);
                   const isSelected = u.id === currentUser.id;
@@ -224,22 +291,35 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
                         setIsUserMenuOpen(false);
                       }}
                       className={`w-full flex items-center justify-between p-2 rounded-xl text-xs transition-all text-left ${
-                        isSelected ? 'bg-cyan-500/20 border border-cyan-500/40 text-white' : 'hover:bg-white/10 text-slate-300'
+                        isSelected ? 'bg-cyan-500/20 border border-cyan-500/40 text-white font-semibold' : 'hover:bg-white/10 text-slate-300'
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full object-cover" referrerPolicy="no-referrer" />
-                        <div>
-                          <div className="font-medium text-white">{u.name}</div>
-                          <span className={`text-[9px] px-1 py-0.2 rounded border ${badge.color}`}>
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full object-cover shrink-0" referrerPolicy="no-referrer" />
+                        <div className="truncate">
+                          <div className="font-medium text-white truncate text-[11px]">{u.name}</div>
+                          <span className={`text-[8px] px-1 py-0.2 rounded border ${badge.color}`}>
                             {badge.label}
                           </span>
                         </div>
                       </div>
-                      {isSelected && <Check className="w-4 h-4 text-cyan-400" />}
+                      {isSelected && <Check className="w-4 h-4 text-cyan-400 shrink-0" />}
                     </button>
                   );
                 })}
+              </div>
+
+              <div className="pt-2 mt-2 border-t border-white/10">
+                <button
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    logout();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-semibold border border-rose-500/20 transition-all"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Se déconnecter</span>
+                </button>
               </div>
             </div>
           )}

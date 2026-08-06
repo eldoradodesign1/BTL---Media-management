@@ -80,7 +80,8 @@ export const ExcelPdfExportModal: React.FC<ExcelPdfExportModalProps> = ({ isOpen
           return {
             'Média': med?.name || pr.mediaId,
             'Client': cli?.name || pr.clientId,
-            'Tarif Média ($)': pr.rateAmount,
+            'Type Tarif': pr.rateType === 'real' ? 'Coût Réel BTL' : 'Prix Catalogue Client',
+            'Tarif Unitaire ($)': pr.rateAmount,
             'Date d\'effet': pr.effectiveDate,
             'Version': pr.version,
           };

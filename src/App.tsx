@@ -19,9 +19,12 @@ import { SettingsView } from './components/settings/SettingsView';
 import { AddEventModal } from './components/modals/AddEventModal';
 import { AddDiffusionModal } from './components/modals/AddDiffusionModal';
 import { AddPaymentModal } from './components/modals/AddPaymentModal';
+import { SupabaseConfigModal } from './components/modals/SupabaseConfigModal';
+import { UserProfileModal } from './components/modals/UserProfileModal';
+import { AuthLoginModal } from './components/modals/AuthLoginModal';
 
 const AppContent: React.FC = () => {
-  const { activeTab, getBgImage, theme } = useApp();
+  const { activeTab, getBgImage, theme, isSupabaseModalOpen, setIsSupabaseModalOpen } = useApp();
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
@@ -102,6 +105,14 @@ const AppContent: React.FC = () => {
         isOpen={isAddPaymentModalOpen}
         onClose={() => setIsAddPaymentModalOpen(false)}
       />
+
+      <SupabaseConfigModal
+        isOpen={isSupabaseModalOpen}
+        onClose={() => setIsSupabaseModalOpen(false)}
+      />
+
+      <UserProfileModal />
+      <AuthLoginModal />
     </div>
   );
 };

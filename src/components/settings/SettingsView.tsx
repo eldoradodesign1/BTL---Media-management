@@ -17,113 +17,69 @@ import {
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
-  const { theme, setTheme, resetToDefaultData, addNotification } = useApp();
+  const { theme, setTheme, resetToDefaultData, addNotification, setIsSupabaseModalOpen, isSupabaseConnected } = useApp();
   const [copied, setCopied] = useState(false);
 
   const sqlSchemaText = `-- =========================================================
 -- MEDIA CAMPAIGN MANAGER - SUPABASE & POSTGRESQL SCHEMA DDL
--- Normalized Architecture for Enterprise Campaign Tracking
+-- Flexible Architecture (Supports string & UUID IDs with RLS)
 -- =========================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ROLES & PERMISSIONS
-CREATE TABLE roles (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  code VARCHAR(50) UNIQUE NOT NULL,
-  name VARCHAR(100) NOT NULL,
-  description TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+CREATE TABLE IF NOT EXISTS roles (id VARCHAR(100) PRIMARY KEY, code VARCHAR(50) UNIQUE NOT NULL, name VARCHAR(100) NOT NULL, description TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS users (id VARCHAR(100) PRIMARY KEY, email VARCHAR(255) UNIQUE NOT NULL, full_name VARCHAR(150) NOT NULL, role_id VARCHAR(100), avatar_url TEXT, client_id VARCHAR(100), password VARCHAR(255) DEFAULT '123456', status VARCHAR(20) DEFAULT 'active', created_at TIMESTAMPTZ DEFAULT NOW());
 
--- USERS
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  email VARCHAR(255) UNIQUE NOT NULL,
-  full_name VARCHAR(150) NOT NULL,
-  role_id UUID REFERENCES roles(id) ON DELETE SET NULL,
-  avatar_url TEXT,
-  status VARCHAR(20) DEFAULT 'active',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- Migration pour utilisateurs :
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password VARCHAR(255) DEFAULT '123456';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS client_id VARCHAR(100);
+CREATE TABLE IF NOT EXISTS regions (id VARCHAR(100) PRIMARY KEY, name VARCHAR(100) NOT NULL, code VARCHAR(10) UNIQUE NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS clients (id VARCHAR(100) PRIMARY KEY, name VARCHAR(150) NOT NULL, code VARCHAR(20) UNIQUE NOT NULL, contact_person VARCHAR(100), email VARCHAR(150), phone VARCHAR(50), created_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS media_types (id VARCHAR(100) PRIMARY KEY, code VARCHAR(50) UNIQUE NOT NULL, label VARCHAR(100) NOT NULL, icon VARCHAR(50));
+CREATE TABLE IF NOT EXISTS focal_points (id VARCHAR(100) PRIMARY KEY, name VARCHAR(150) NOT NULL, phone VARCHAR(50) NOT NULL, email VARCHAR(150), client_id VARCHAR(100), media_id VARCHAR(100), created_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS medias (id VARCHAR(100) PRIMARY KEY, name VARCHAR(150) NOT NULL, location VARCHAR(100) NOT NULL, type_id VARCHAR(100), transport_fee NUMERIC(12, 2) DEFAULT 0.00, phone VARCHAR(50), default_focal_point_id VARCHAR(100), created_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS pricing (id VARCHAR(100) PRIMARY KEY, media_id VARCHAR(100) NOT NULL, client_id VARCHAR(100) NOT NULL, rate_type VARCHAR(20) NOT NULL DEFAULT 'catalog', rate_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00, effective_date DATE DEFAULT CURRENT_DATE, version INT DEFAULT 1, CONSTRAINT unique_media_client_rate_type UNIQUE(media_id, client_id, rate_type));
 
--- REGIONS
-CREATE TABLE regions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name VARCHAR(100) NOT NULL,
-  code VARCHAR(10) UNIQUE NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- Script de migration si la table pricing existe déjà sans rate_type :
+ALTER TABLE pricing ADD COLUMN IF NOT EXISTS rate_type VARCHAR(20) NOT NULL DEFAULT 'catalog';
+ALTER TABLE pricing DROP CONSTRAINT IF EXISTS unique_media_client_pricing;
+ALTER TABLE pricing DROP CONSTRAINT IF EXISTS unique_media_client_rate_type;
+ALTER TABLE pricing ADD CONSTRAINT unique_media_client_rate_type UNIQUE(media_id, client_id, rate_type);
+CREATE TABLE IF NOT EXISTS events (id VARCHAR(100) PRIMARY KEY, event_date DATE NOT NULL, name VARCHAR(200) NOT NULL, client_id VARCHAR(100) NOT NULL, region_id VARCHAR(100) NOT NULL, status VARCHAR(50) DEFAULT 'Planifié', notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS media_events (id VARCHAR(100) PRIMARY KEY, event_id VARCHAR(100) NOT NULL, media_id VARCHAR(100) NOT NULL, proof_of_diffusion TEXT, expense_type VARCHAR(50), updated_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS media_payments (id VARCHAR(100) PRIMARY KEY, payment_date DATE NOT NULL DEFAULT CURRENT_DATE, media_id VARCHAR(100) NOT NULL, event_id VARCHAR(100) NOT NULL, client_id VARCHAR(100), focal_point_id VARCHAR(100), amount NUMERIC(12, 2) NOT NULL, payment_method VARCHAR(50) NOT NULL, reference_no VARCHAR(100), notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS audit_logs (id VARCHAR(100) PRIMARY KEY, user_id VARCHAR(100), user_name VARCHAR(150), action VARCHAR(50) NOT NULL, entity_type VARCHAR(50) NOT NULL, entity_id VARCHAR(100), details TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 
--- CLIENTS
-CREATE TABLE clients (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name VARCHAR(150) NOT NULL,
-  code VARCHAR(20) UNIQUE NOT NULL,
-  contact_person VARCHAR(100),
-  email VARCHAR(150),
-  phone VARCHAR(50),
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- Enable RLS and add public access policies
+ALTER TABLE regions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE focal_points ENABLE ROW LEVEL SECURITY;
+ALTER TABLE medias ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pricing ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE media_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE media_payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
--- MEDIAS
-CREATE TABLE medias (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name VARCHAR(150) NOT NULL,
-  location VARCHAR(100) NOT NULL,
-  type_id UUID,
-  transport_fee NUMERIC(12, 2) DEFAULT 0.00,
-  phone VARCHAR(50),
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- PRICING MATRIX
-CREATE TABLE pricing (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  media_id UUID REFERENCES medias(id) ON DELETE CASCADE,
-  client_id UUID REFERENCES clients(id) ON DELETE CASCADE,
-  rate_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-  effective_date DATE DEFAULT CURRENT_DATE,
-  version INT DEFAULT 1,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- EVENTS
-CREATE TABLE events (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  event_date DATE NOT NULL,
-  name VARCHAR(200) NOT NULL,
-  client_id UUID REFERENCES clients(id) ON DELETE RESTRICT,
-  region_id UUID REFERENCES regions(id) ON DELETE RESTRICT,
-  status VARCHAR(50) DEFAULT 'Planifié',
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- MEDIA_EVENTS (DIFFUSIONS)
-CREATE TABLE media_events (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  event_id UUID REFERENCES events(id) ON DELETE CASCADE,
-  media_id UUID REFERENCES medias(id) ON DELETE RESTRICT,
-  proof_of_diffusion TEXT,
-  expense_type VARCHAR(50),
-  amount NUMERIC(12, 2) DEFAULT 0.00,
-  paid NUMERIC(12, 2) DEFAULT 0.00,
-  pending NUMERIC(12, 2) DEFAULT 0.00,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- MEDIA_PAYMENTS
-CREATE TABLE media_payments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
-  media_id UUID REFERENCES medias(id) ON DELETE RESTRICT,
-  event_id UUID REFERENCES events(id) ON DELETE CASCADE,
-  amount NUMERIC(12, 2) NOT NULL,
-  payment_method VARCHAR(50),
-  reference_no VARCHAR(100),
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);`;
+DROP POLICY IF EXISTS "Public Regions" ON regions;
+CREATE POLICY "Public Regions" ON regions FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public Clients" ON clients;
+CREATE POLICY "Public Clients" ON clients FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public FocalPoints" ON focal_points;
+CREATE POLICY "Public FocalPoints" ON focal_points FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public Medias" ON medias;
+CREATE POLICY "Public Medias" ON medias FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public Pricing" ON pricing;
+CREATE POLICY "Public Pricing" ON pricing FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public Events" ON events;
+CREATE POLICY "Public Events" ON events FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public MediaEvents" ON media_events;
+CREATE POLICY "Public MediaEvents" ON media_events FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public Payments" ON media_payments;
+CREATE POLICY "Public Payments" ON media_payments FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public Audit" ON audit_logs;
+CREATE POLICY "Public Audit" ON audit_logs FOR ALL USING (true) WITH CHECK (true);
+`;
 
   const copySql = () => {
     navigator.clipboard.writeText(sqlSchemaText);
@@ -220,6 +176,34 @@ CREATE TABLE media_payments (
             </p>
           </button>
         </div>
+      </div>
+
+      {/* Live Supabase Connection */}
+      <div className="p-6 rounded-3xl bg-slate-900/60 border border-emerald-500/30 backdrop-blur-2xl shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Database className="w-5 h-5 text-emerald-400" />
+            <h2 className="text-base font-bold text-white">Connexion Supabase PostgreSQL</h2>
+            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+              isSupabaseConnected
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+            }`}>
+              {isSupabaseConnected ? 'Connecté & Synchronisé' : 'Configuration Requise / Offline'}
+            </span>
+          </div>
+          <p className="text-xs text-slate-300 max-w-xl">
+            Liez l'application à votre projet Supabase (URL + Anon Key) pour synchroniser la base de données en temps réel et conserver Supabase comme source unique de vérité.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setIsSupabaseModalOpen(true)}
+          className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20 shrink-0 flex items-center gap-2"
+        >
+          <Database className="w-4 h-4" />
+          <span>Configurer la Clé Supabase</span>
+        </button>
       </div>
 
       {/* Supabase SQL DDL Exporter */}

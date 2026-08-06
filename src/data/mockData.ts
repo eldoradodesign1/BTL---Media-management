@@ -13,6 +13,13 @@ import {
 
 export const initialUsers: User[] = [
   {
+    id: 'u0',
+    name: 'Super Admin BTL',
+    email: 'superadmin@btl-agency.cd',
+    role: 'super-admin',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+  },
+  {
     id: 'u1',
     name: 'Jean-Marc Kabanga',
     email: 'j.kabanga@mediacampaign.com',
@@ -39,6 +46,14 @@ export const initialUsers: User[] = [
     email: 'c.tshilombo@mediacampaign.com',
     role: 'auditor',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'u5',
+    name: 'Marc Tshiani (Client Vodacom)',
+    email: 'm.tshiani@vodacom.cd',
+    role: 'client',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    clientId: 'cli-1'
   }
 ];
 
@@ -111,41 +126,80 @@ export const initialMedias: Media[] = [
 
 export const initialPricingRates: PricingRate[] = [
   // RTNC Télévision
-  { id: 'pr-1', mediaId: 'med-1', clientId: 'cli-1', rateAmount: 1800, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-2', mediaId: 'med-1', clientId: 'cli-2', rateAmount: 1500, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-3', mediaId: 'med-1', clientId: 'cli-3', rateAmount: 2200, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-4', mediaId: 'med-1', clientId: 'cli-4', rateAmount: 1650, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-1c', mediaId: 'med-1', clientId: 'cli-1', rateType: 'catalog', rateAmount: 1800, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-1r', mediaId: 'med-1', clientId: 'cli-1', rateType: 'real', rateAmount: 1350, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-2c', mediaId: 'med-1', clientId: 'cli-2', rateType: 'catalog', rateAmount: 1500, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-2r', mediaId: 'med-1', clientId: 'cli-2', rateType: 'real', rateAmount: 1100, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-3c', mediaId: 'med-1', clientId: 'cli-3', rateType: 'catalog', rateAmount: 2200, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-3r', mediaId: 'med-1', clientId: 'cli-3', rateType: 'real', rateAmount: 1700, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-4c', mediaId: 'med-1', clientId: 'cli-4', rateType: 'catalog', rateAmount: 1650, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-4r', mediaId: 'med-1', clientId: 'cli-4', rateType: 'real', rateAmount: 1250, effectiveDate: '2025-01-01', version: 1 },
 
   // Top Congo FM
-  { id: 'pr-5', mediaId: 'med-2', clientId: 'cli-1', rateAmount: 650, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-6', mediaId: 'med-2', clientId: 'cli-2', rateAmount: 500, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-7', mediaId: 'med-2', clientId: 'cli-3', rateAmount: 800, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-8', mediaId: 'med-2', clientId: 'cli-4', rateAmount: 600, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-5c', mediaId: 'med-2', clientId: 'cli-1', rateType: 'catalog', rateAmount: 650, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-5r', mediaId: 'med-2', clientId: 'cli-1', rateType: 'real', rateAmount: 480, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-6c', mediaId: 'med-2', clientId: 'cli-2', rateType: 'catalog', rateAmount: 500, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-6r', mediaId: 'med-2', clientId: 'cli-2', rateType: 'real', rateAmount: 380, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-7c', mediaId: 'med-2', clientId: 'cli-3', rateType: 'catalog', rateAmount: 800, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-7r', mediaId: 'med-2', clientId: 'cli-3', rateType: 'real', rateAmount: 600, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-8c', mediaId: 'med-2', clientId: 'cli-4', rateType: 'catalog', rateAmount: 600, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-8r', mediaId: 'med-2', clientId: 'cli-4', rateType: 'real', rateAmount: 450, effectiveDate: '2025-01-01', version: 1 },
 
   // Radio Okapi Goma
-  { id: 'pr-9', mediaId: 'med-3', clientId: 'cli-1', rateAmount: 750, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-10', mediaId: 'med-3', clientId: 'cli-2', rateAmount: 600, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-11', mediaId: 'med-3', clientId: 'cli-3', rateAmount: 900, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-12', mediaId: 'med-3', clientId: 'cli-4', rateAmount: 700, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-9c', mediaId: 'med-3', clientId: 'cli-1', rateType: 'catalog', rateAmount: 750, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-9r', mediaId: 'med-3', clientId: 'cli-1', rateType: 'real', rateAmount: 550, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-10c', mediaId: 'med-3', clientId: 'cli-2', rateType: 'catalog', rateAmount: 600, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-10r', mediaId: 'med-3', clientId: 'cli-2', rateType: 'real', rateAmount: 420, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-11c', mediaId: 'med-3', clientId: 'cli-3', rateType: 'catalog', rateAmount: 900, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-11r', mediaId: 'med-3', clientId: 'cli-3', rateType: 'real', rateAmount: 680, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-12c', mediaId: 'med-3', clientId: 'cli-4', rateType: 'catalog', rateAmount: 700, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-12r', mediaId: 'med-3', clientId: 'cli-4', rateType: 'real', rateAmount: 520, effectiveDate: '2025-01-01', version: 1 },
 
   // Digital Congo Magazine
-  { id: 'pr-13', mediaId: 'med-4', clientId: 'cli-1', rateAmount: 1200, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-14', mediaId: 'med-4', clientId: 'cli-2', rateAmount: 1000, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-15', mediaId: 'med-4', clientId: 'cli-3', rateAmount: 1400, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-16', mediaId: 'med-4', clientId: 'cli-4', rateAmount: 1100, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-13c', mediaId: 'med-4', clientId: 'cli-1', rateType: 'catalog', rateAmount: 1200, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-13r', mediaId: 'med-4', clientId: 'cli-1', rateType: 'real', rateAmount: 900, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-14c', mediaId: 'med-4', clientId: 'cli-2', rateType: 'catalog', rateAmount: 1000, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-14r', mediaId: 'med-4', clientId: 'cli-2', rateType: 'real', rateAmount: 750, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-15c', mediaId: 'med-4', clientId: 'cli-3', rateType: 'catalog', rateAmount: 1400, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-15r', mediaId: 'med-4', clientId: 'cli-3', rateType: 'real', rateAmount: 1050, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-16c', mediaId: 'med-4', clientId: 'cli-4', rateType: 'catalog', rateAmount: 1100, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-16r', mediaId: 'med-4', clientId: 'cli-4', rateType: 'real', rateAmount: 800, effectiveDate: '2025-01-01', version: 1 },
 
   // B-One TV Lubumbashi
-  { id: 'pr-17', mediaId: 'med-5', clientId: 'cli-1', rateAmount: 1400, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-18', mediaId: 'med-5', clientId: 'cli-2', rateAmount: 1200, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-19', mediaId: 'med-5', clientId: 'cli-3', rateAmount: 1600, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-17c', mediaId: 'med-5', clientId: 'cli-1', rateType: 'catalog', rateAmount: 1400, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-17r', mediaId: 'med-5', clientId: 'cli-1', rateType: 'real', rateAmount: 1000, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-18c', mediaId: 'med-5', clientId: 'cli-2', rateType: 'catalog', rateAmount: 1200, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-18r', mediaId: 'med-5', clientId: 'cli-2', rateType: 'real', rateAmount: 850, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-19c', mediaId: 'med-5', clientId: 'cli-3', rateType: 'catalog', rateAmount: 1600, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-19r', mediaId: 'med-5', clientId: 'cli-3', rateType: 'real', rateAmount: 1150, effectiveDate: '2025-01-01', version: 1 },
 
   // Jeune Afrique Digital
-  { id: 'pr-20', mediaId: 'med-6', clientId: 'cli-1', rateAmount: 2500, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-21', mediaId: 'med-6', clientId: 'cli-3', rateAmount: 3000, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-20c', mediaId: 'med-6', clientId: 'cli-1', rateType: 'catalog', rateAmount: 2500, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-20r', mediaId: 'med-6', clientId: 'cli-1', rateType: 'real', rateAmount: 1900, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-21c', mediaId: 'med-6', clientId: 'cli-3', rateType: 'catalog', rateAmount: 3000, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-21r', mediaId: 'med-6', clientId: 'cli-3', rateType: 'real', rateAmount: 2300, effectiveDate: '2025-01-01', version: 1 },
 
   // Panneaux OOH
-  { id: 'pr-22', mediaId: 'med-7', clientId: 'cli-1', rateAmount: 3500, effectiveDate: '2025-01-01', version: 1 },
-  { id: 'pr-23', mediaId: 'med-7', clientId: 'cli-3', rateAmount: 4000, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-22c', mediaId: 'med-7', clientId: 'cli-1', rateType: 'catalog', rateAmount: 3500, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-22r', mediaId: 'med-7', clientId: 'cli-1', rateType: 'real', rateAmount: 2700, effectiveDate: '2025-01-01', version: 1 },
+
+  { id: 'pr-23c', mediaId: 'med-7', clientId: 'cli-3', rateType: 'catalog', rateAmount: 4000, effectiveDate: '2025-01-01', version: 1 },
+  { id: 'pr-23r', mediaId: 'med-7', clientId: 'cli-3', rateType: 'real', rateAmount: 3100, effectiveDate: '2025-01-01', version: 1 },
 ];
 
 export const initialEvents: CampaignEvent[] = [
