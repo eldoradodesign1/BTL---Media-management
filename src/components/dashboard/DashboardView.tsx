@@ -47,6 +47,8 @@ export const DashboardView: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<string>(defaultClientId);
   const [selectedMonth, setSelectedMonth] = useState<string>('all'); // 'all', '0', '1', ...
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [leftFilterType, setLeftFilterType] = useState<'events' | 'medias'>('events');
+  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
 
   // Modals state
   const [isPoModalOpen, setIsPoModalOpen] = useState(false);
@@ -167,11 +169,37 @@ export const DashboardView: React.FC = () => {
     };
   }, [activeEventDetail, activeEventDiffusions]);
 
+  // Selected Media Details
+  const activeMediaDetail = useMemo(() => {
+    if (!selectedMediaId) {
+      return medias[0] || null;
+    }
+    return medias.find((m) => m.id === selectedMediaId) || null;
+  }, [selectedMediaId, medias]);
+
+  const activeMediaDiffusions = useMemo(() => {
+    if (!activeMediaDetail) return [];
+    return mediaByEvents.filter((m) => m.mediaId === activeMediaDetail.id);
+  }, [activeMediaDetail, mediaByEvents]);
+
+  const activeMediaMetrics = useMemo(() => {
+    if (!activeMediaDetail) return { eventCount: 0, total: 0, paid: 0, pending: 0 };
+    const total = activeMediaDiffusions.reduce((sum, m) => sum + m.amount, 0);
+    const paid = activeMediaDiffusions.reduce((sum, m) => sum + m.paid, 0);
+    const pending = activeMediaDiffusions.reduce((sum, m) => sum + m.pending, 0);
+    return {
+      eventCount: activeMediaDiffusions.length,
+      total,
+      paid,
+      pending
+    };
+  }, [activeMediaDetail, activeMediaDiffusions]);
+
   // Chart type logic: Monthly breakdown only if selectedMonth === 'all' and no single event selected
   const isMonthlyView = selectedMonth === 'all' && !selectedEventId;
 
   const handleChartClick = (params: any) => {
-    if (selectedMonth === 'all') {
+    if (selectedMonth === 'all' && leftFilterType === 'events') {
       const monthIndexMap: Record<string, string> = {
         'JANV': '0', 'FÉVR': '1', 'MARS': '2', 'AVR': '3',
         'MAI': '4', 'JUIN': '5', 'JUIL': '6', 'AOÛT': '7',
@@ -193,8 +221,123 @@ export const DashboardView: React.FC = () => {
     }
   };
 
-  // Main Bar Chart Option (Monthly OR Media Breakdown)
+  // Main Bar Chart Option (Monthly OR Media Breakdown OR Event Breakdown for Selected Media)
   const mainChartOption = useMemo(() => {
+    // 1. MEDIAS MODE: Histogram shows payments/budget per Event for the selected Media
+    if (leftFilterType === 'medias') {
+      let relevantDiffusions = mediaByEvents;
+      if (selectedMediaId) {
+        relevantDiffusions = mediaByEvents.filter((m) => m.mediaId === selectedMediaId);
+      } else if (activeMediaDetail) {
+        relevantDiffusions = mediaByEvents.filter((m) => m.mediaId === activeMediaDetail.id);
+      }
+
+      if (selectedClientId !== 'all') {
+        relevantDiffusions = relevantDiffusions.filter((m) => {
+          const evt = events.find((e) => e.id === m.eventId);
+          return evt && evt.clientId === selectedClientId;
+        });
+      }
+
+      if (selectedMonth !== 'all') {
+        relevantDiffusions = relevantDiffusions.filter((m) => {
+          const dateStr = m.eventDate || events.find((e) => e.id === m.eventId)?.eventDate;
+          if (dateStr) {
+            return new Date(dateStr).getMonth().toString() === selectedMonth;
+          }
+          return true;
+        });
+      }
+
+      const eventMap: Record<string, { eventId: string; fullName: string; shortName: string; amount: number; paid: number }> = {};
+
+      relevantDiffusions.forEach((m) => {
+        const evt = events.find((e) => e.id === m.eventId);
+        const fullName = evt?.name || 'Événement';
+        // Truncate long event titles for clean axis labels readability
+        const shortName = fullName.length > 14 ? fullName.substring(0, 12) + '...' : fullName;
+
+        if (!eventMap[m.eventId]) {
+          eventMap[m.eventId] = {
+            eventId: m.eventId,
+            fullName,
+            shortName,
+            amount: 0,
+            paid: 0
+          };
+        }
+        eventMap[m.eventId].amount += m.amount;
+        eventMap[m.eventId].paid += m.paid || 0;
+      });
+
+      if (Object.keys(eventMap).length === 0) {
+        filteredEvents.slice(0, 5).forEach((e) => {
+          const shortName = e.name.length > 14 ? e.name.substring(0, 12) + '...' : e.name;
+          eventMap[e.id] = { eventId: e.id, fullName: e.name, shortName, amount: 0, paid: 0 };
+        });
+      }
+
+      const items = Object.values(eventMap);
+      const axisData = items.map((item) => item.shortName);
+      const fullNames = items.map((item) => item.fullName);
+      const amountData = items.map((item) => item.amount);
+      const paidData = items.map((item) => item.paid);
+
+      return {
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+          borderColor: 'rgba(255, 255, 255, 0.15)',
+          textStyle: { color: '#f8fafc', fontSize: 11 },
+          formatter: (params: any[]) => {
+            const dataIdx = params[0]?.dataIndex ?? 0;
+            const fullTitle = fullNames[dataIdx] || params[0]?.axisValue;
+            let res = `<div class="font-bold border-b border-white/10 pb-1 mb-1 text-cyan-300">${fullTitle}</div>`;
+            params.forEach((item) => {
+              res += `<div class="flex items-center justify-between gap-4 text-xs py-0.5">
+                <span>${item.marker} ${item.seriesName}:</span>
+                <span class="font-mono font-bold">$${item.value.toLocaleString('fr-FR')}</span>
+              </div>`;
+            });
+            return res;
+          }
+        },
+        legend: {
+          top: '0',
+          right: '10',
+          textStyle: { color: textColor, fontSize: 11 }
+        },
+        grid: { left: '3%', right: '3%', bottom: '20%', top: '18%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: axisData,
+          axisLabel: { color: textColor, fontSize: 10, fontWeight: 'bold', interval: 0, rotate: axisData.length > 3 ? 15 : 0 },
+          axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } }
+        },
+        yAxis: {
+          type: 'value',
+          axisLabel: { color: textColor, formatter: '${value}' },
+          splitLine: { lineStyle: { color: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' } }
+        },
+        series: [
+          {
+            name: 'Budget Engagé',
+            type: 'bar',
+            data: amountData,
+            itemStyle: { color: '#38bdf8', borderRadius: [6, 6, 0, 0] }
+          },
+          {
+            name: 'Paiements Effectués',
+            type: 'bar',
+            data: paidData,
+            itemStyle: { color: '#34d399', borderRadius: [6, 6, 0, 0] }
+          }
+        ]
+      };
+    }
+
+    // 2. EVENTS MODE: Monthly View OR Media Breakdown
     if (isMonthlyView) {
       const months = ['JANV', 'FÉVR', 'MARS', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛT', 'SEPT', 'OCT', 'NOV', 'DÉC'];
       const amountData = new Array(12).fill(0);
@@ -359,7 +502,7 @@ export const DashboardView: React.FC = () => {
         }
       ]
     };
-  }, [isMonthlyView, filteredMediaEvents, filteredPayments, filteredEvents, mediaByEvents, events, medias, selectedEventId, activeEventDetail, textColor, isDark]);
+  }, [leftFilterType, selectedMediaId, activeMediaDetail, isMonthlyView, filteredMediaEvents, filteredPayments, filteredEvents, mediaByEvents, events, medias, selectedEventId, activeEventDetail, textColor, isDark, selectedClientId, selectedMonth]);
 
   // 2. Client Breakdown Donut
   const clientChartOption = useMemo(() => {
@@ -602,53 +745,115 @@ export const DashboardView: React.FC = () => {
 
       {/* MIDDLE SECTION: Events List + Comparative Monthly Chart + Event Detail Card */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Events Selector List */}
+        {/* Left: Events / Medias Selector List with Toggle */}
         <div className="lg:col-span-3 p-5 rounded-3xl bg-slate-900/80 border border-white/15 backdrop-blur-2xl flex flex-col justify-between max-h-[440px]">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/10">
-            <h3 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-blue-400" />
-              Événements ({filteredEvents.length})
-            </h3>
-            <span className="text-[10px] text-slate-400">Sélection</span>
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/10 gap-2">
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-black/40 border border-white/10 shrink-0">
+              <button
+                onClick={() => {
+                  setLeftFilterType('events');
+                  setSelectedMediaId(null);
+                }}
+                className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 ${
+                  leftFilterType === 'events'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Événements</span>
+              </button>
+              <button
+                onClick={() => {
+                  setLeftFilterType('medias');
+                  setSelectedEventId(null);
+                }}
+                className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 ${
+                  leftFilterType === 'medias'
+                    ? 'bg-cyan-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Tv className="w-3.5 h-3.5" />
+                <span>Médias</span>
+              </button>
+            </div>
+            <span className="text-[10px] text-slate-400 font-mono font-bold">
+              {leftFilterType === 'events' ? `${filteredEvents.length}` : `${medias.length}`}
+            </span>
           </div>
 
           <div className="space-y-2 overflow-y-auto pr-1 flex-1">
-            {filteredEvents.length === 0 ? (
-              <div className="text-center py-8 text-xs text-slate-400">
-                Aucun événement pour ce critère.
-              </div>
+            {leftFilterType === 'events' ? (
+              filteredEvents.length === 0 ? (
+                <div className="text-center py-8 text-xs text-slate-400">
+                  Aucun événement pour ce critère.
+                </div>
+              ) : (
+                filteredEvents.map((e) => {
+                  const isSelected = activeEventDetail?.id === e.id;
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() => setSelectedEventId(e.id)}
+                      className={`w-full text-left p-3 rounded-2xl text-xs transition-all flex items-center justify-between border ${
+                        isSelected
+                          ? 'bg-blue-600/20 border-blue-500 text-white font-bold shadow-md'
+                          : 'bg-black/30 border-white/5 text-slate-300 hover:bg-white/5'
+                      }`}
+                    >
+                      <div className="truncate pr-2">
+                        <div className="truncate font-semibold uppercase">{e.name}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">{e.clientName || 'Client'} • {e.eventDate}</div>
+                      </div>
+                      <ChevronRight className={`w-4 h-4 shrink-0 ${isSelected ? 'text-blue-400' : 'text-slate-600'}`} />
+                    </button>
+                  );
+                })
+              )
             ) : (
-              filteredEvents.map((e) => {
-                const isSelected = activeEventDetail?.id === e.id;
-                return (
-                  <button
-                    key={e.id}
-                    onClick={() => setSelectedEventId(e.id)}
-                    className={`w-full text-left p-3 rounded-2xl text-xs transition-all flex items-center justify-between border ${
-                      isSelected
-                        ? 'bg-blue-600/20 border-blue-500 text-white font-bold shadow-md'
-                        : 'bg-black/30 border-white/5 text-slate-300 hover:bg-white/5'
-                    }`}
-                  >
-                    <div className="truncate pr-2">
-                      <div className="truncate font-semibold uppercase">{e.name}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">{e.clientName || 'Client'} • {e.eventDate}</div>
-                    </div>
-                    <ChevronRight className={`w-4 h-4 shrink-0 ${isSelected ? 'text-blue-400' : 'text-slate-600'}`} />
-                  </button>
-                );
-              })
+              medias.length === 0 ? (
+                <div className="text-center py-8 text-xs text-slate-400">
+                  Aucun média référencé.
+                </div>
+              ) : (
+                medias.map((m) => {
+                  const isSelected = activeMediaDetail?.id === m.id;
+                  const diffsCount = mediaByEvents.filter((d) => d.mediaId === m.id).length;
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => setSelectedMediaId(m.id)}
+                      className={`w-full text-left p-3 rounded-2xl text-xs transition-all flex items-center justify-between border ${
+                        isSelected
+                          ? 'bg-cyan-600/20 border-cyan-500 text-white font-bold shadow-md'
+                          : 'bg-black/30 border-white/5 text-slate-300 hover:bg-white/5'
+                      }`}
+                    >
+                      <div className="truncate pr-2">
+                        <div className="truncate font-semibold uppercase">{m.name}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          {m.category || m.type || 'Média'} • {diffsCount} campagne{diffsCount > 1 ? 's' : ''}
+                        </div>
+                      </div>
+                      <ChevronRight className={`w-4 h-4 shrink-0 ${isSelected ? 'text-cyan-400' : 'text-slate-600'}`} />
+                    </button>
+                  );
+                })
+              )
             )}
           </div>
         </div>
 
-        {/* Center: Main Comparison Chart (Monthly or Media Histogram) */}
+        {/* Center: Main Comparison Chart (Monthly OR Media Histogram OR Event Histogram for Media) */}
         <div className="lg:col-span-6 p-6 rounded-3xl bg-slate-900/80 border border-white/15 backdrop-blur-2xl shadow-2xl flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
-              <BarChart3 className={`w-4 h-4 ${isMonthlyView ? 'text-blue-400' : 'text-cyan-400'}`} />
+              <BarChart3 className={`w-4 h-4 ${leftFilterType === 'medias' ? 'text-cyan-400' : isMonthlyView ? 'text-blue-400' : 'text-cyan-400'}`} />
               <span>
-                {isMonthlyView
+                {leftFilterType === 'medias'
+                  ? `Paiements par Événement : ${activeMediaDetail ? activeMediaDetail.name : 'Tous les Médias'}`
+                  : isMonthlyView
                   ? 'Suivi Mensuel : Budget Engagé vs Payé'
                   : `Histogramme Médias : ${activeEventDetail ? activeEventDetail.name : 'Événements du Mois'}`}
               </span>
@@ -664,64 +869,117 @@ export const DashboardView: React.FC = () => {
           />
         </div>
 
-        {/* Right: Selected Event Info Card */}
+        {/* Right: Selected Item Info Card (Event or Media) */}
         <div className="lg:col-span-3 p-6 rounded-3xl bg-slate-900/90 border border-white/20 shadow-2xl flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] text-blue-400 font-extrabold uppercase tracking-widest">
-                Fiche Campagne Événement
-              </span>
-              {activeEventDetail && (
-                <button
-                  onClick={() => setIsEditEventModalOpen(true)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/20 transition-all flex items-center gap-1 text-[10px] font-bold"
-                  title="Modifier cet événement"
-                >
-                  <Edit className="w-3.5 h-3.5" />
-                  <span>Modifier</span>
-                </button>
-              )}
-            </div>
-            <h3 className="text-base font-extrabold text-white uppercase tracking-tight mb-2">
-              {activeEventDetail?.name || 'Aucun Événement'}
-            </h3>
-            <div className="text-xs text-slate-300 font-medium mb-4 pb-3 border-b border-white/10">
-              Client : <span className="text-white font-bold">{activeEventDetail?.clientName || 'Inconnu'}</span>
-            </div>
+          {leftFilterType === 'events' ? (
+            <>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-blue-400 font-extrabold uppercase tracking-widest">
+                    Fiche Campagne Événement
+                  </span>
+                  {activeEventDetail && (
+                    <button
+                      onClick={() => setIsEditEventModalOpen(true)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/20 transition-all flex items-center gap-1 text-[10px] font-bold"
+                      title="Modifier cet événement"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      <span>Modifier</span>
+                    </button>
+                  )}
+                </div>
+                <h3 className="text-base font-extrabold text-white uppercase tracking-tight mb-2">
+                  {activeEventDetail?.name || 'Aucun Événement'}
+                </h3>
+                <div className="text-xs text-slate-300 font-medium mb-4 pb-3 border-b border-white/10">
+                  Client : <span className="text-white font-bold">{activeEventDetail?.clientName || 'Inconnu'}</span>
+                </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Médias Engagés</span>
-                <span className="font-mono font-bold text-white">{activeEventMetrics.mediaCount}</span>
+                <div className="space-y-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Médias Engagés</span>
+                    <span className="font-mono font-bold text-white">{activeEventMetrics.mediaCount}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Payé Médias</span>
+                    <span className="font-mono font-bold text-emerald-400">
+                      ${activeEventMetrics.paid.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Pending Médias</span>
+                    <span className="font-mono font-bold text-amber-400">
+                      ${activeEventMetrics.pending.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  <div className="pt-3 border-t border-white/10 flex items-center justify-between text-sm font-black">
+                    <span className="text-slate-200">Total Engagé</span>
+                    <span className="font-mono text-white">
+                      ${activeEventMetrics.total.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Payé Médias</span>
-                <span className="font-mono font-bold text-emerald-400">
-                  ${activeEventMetrics.paid.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}
-                </span>
+              <div className="mt-4 p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-300 flex items-center gap-2">
+                <Info className="w-4 h-4 text-blue-400 shrink-0" />
+                <span>Statut : {activeEventDetail?.status || 'En cours'}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-cyan-400 font-extrabold uppercase tracking-widest">
+                    Fiche Média Sélectionné
+                  </span>
+                </div>
+                <h3 className="text-base font-extrabold text-white uppercase tracking-tight mb-2">
+                  {activeMediaDetail?.name || 'Aucun Média'}
+                </h3>
+                <div className="text-xs text-slate-300 font-medium mb-4 pb-3 border-b border-white/10">
+                  Catégorie : <span className="text-white font-bold">{activeMediaDetail?.category || activeMediaDetail?.type || 'BTL'}</span>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Campagnes Engagées</span>
+                    <span className="font-mono font-bold text-white">{activeMediaMetrics.eventCount}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Payé Média</span>
+                    <span className="font-mono font-bold text-emerald-400">
+                      ${activeMediaMetrics.paid.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Reste à Payer</span>
+                    <span className="font-mono font-bold text-amber-400">
+                      ${activeMediaMetrics.pending.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  <div className="pt-3 border-t border-white/10 flex items-center justify-between text-sm font-black">
+                    <span className="text-slate-200">Budget Total</span>
+                    <span className="font-mono text-white">
+                      ${activeMediaMetrics.total.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Pending Médias</span>
-                <span className="font-mono font-bold text-amber-400">
-                  ${activeEventMetrics.pending.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}
-                </span>
+              <div className="mt-4 p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-[11px] text-cyan-300 flex items-center gap-2">
+                <Info className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span>Contact : {activeMediaDetail?.focalPointName || 'Point Focal Média'}</span>
               </div>
-
-              <div className="pt-3 border-t border-white/10 flex items-center justify-between text-sm font-black">
-                <span className="text-slate-200">Total Engagé</span>
-                <span className="font-mono text-white">
-                  ${activeEventMetrics.total.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-300 flex items-center gap-2">
-            <Info className="w-4 h-4 text-blue-400 shrink-0" />
-            <span>Statut : {activeEventDetail?.status || 'En cours'}</span>
-          </div>
+            </>
+          )}
         </div>
       </div>
 
