@@ -33,6 +33,11 @@ import {
 import { supabaseService } from '../lib/supabaseService';
 import { getSupabaseConfig } from '../lib/supabase';
 
+// Background images generated for themes
+import darkBg from '../assets/images/bg_dark_smoke_1786007004233.jpg';
+import lightBg from '../assets/images/bg_light_pastel_1786007019240.jpg';
+import classicBg from '../assets/images/bg_classic_geo_1786007034776.jpg';
+
 interface ToastNotification {
   id: string;
   type: 'success' | 'info' | 'warning' | 'error';
@@ -44,6 +49,7 @@ interface AppContextType {
   // Theme & Style
   theme: AppTheme;
   setTheme: (t: AppTheme) => void;
+  getBgImage: () => string;
 
   // Active User & Role
   currentUser: User;
@@ -147,6 +153,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setTheme = (t: AppTheme) => {
     setThemeState(t);
     localStorage.setItem('mcm_theme', t);
+  };
+
+  const getBgImage = () => {
+    if (theme === 'light') return lightBg;
+    if (theme === 'classic') return classicBg;
+    return darkBg;
   };
 
   // User & Auth State
@@ -976,6 +988,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         theme,
         setTheme,
+        getBgImage,
         currentUser,
         setCurrentUser,
         users,
