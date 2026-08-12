@@ -1,173 +1,72 @@
 import React from 'react';
-import { useApp } from '../../context/AppContext';
 import {
-  LayoutDashboard,
-  Calendar,
-  Tv,
+  CalendarDays,
   CreditCard,
+  LayoutDashboard,
   Radio,
-  Building2,
-  DollarSign,
-  FileSpreadsheet,
-  Settings,
-  Sparkles,
-  Zap,
-  TrendingUp,
-  Layers
+  Settings2,
+  SlidersHorizontal,
+  Tv,
+  WalletCards,
 } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
+import { useI18n } from '../../i18n';
 
 export const Sidebar: React.FC = () => {
-  const { activeTab, setActiveTab, events, mediaByEvents, mediaPayments, currentUser } = useApp();
+  const { activeTab, setActiveTab, events, mediaPayments } = useApp();
+  const { t } = useI18n();
 
-  const totalEventsCount = events.length;
-  const totalDiffusionsCount = mediaByEvents.length;
-  const totalPaymentsCount = mediaPayments.length;
-  const isSuperAdmin = currentUser?.role === 'super-admin';
-
-  const navItems = [
-    {
-      id: 'dashboard',
-      label: 'Tableau de Bord',
-      icon: LayoutDashboard,
-      badge: null,
-      desc: 'KPIs, Analytics ECharts & Sunburst',
-    },
-    {
-      id: 'events',
-      label: 'Événements Média',
-      icon: Calendar,
-      badge: totalEventsCount,
-      desc: 'Campagnes & événements médias',
-    },
-    {
-      id: 'diffusions',
-      label: 'Diffusions & Charges',
-      icon: Tv,
-      badge: totalDiffusionsCount,
-      desc: 'Media_by_events avec calcul auto',
-    },
-    {
-      id: 'payments',
-      label: 'Paiements Médias',
-      icon: CreditCard,
-      badge: totalPaymentsCount,
-      desc: 'Acomptes, soldes & points focaux',
-    },
-    {
-      id: 'medias',
-      label: 'Médias & Points Focaux',
-      icon: Radio,
-      badge: null,
-      desc: 'Chaînes TV, Radios, Presse & Contacts',
-    },
-    {
-      id: 'clients',
-      label: 'Clients & Régions',
-      icon: Building2,
-      badge: null,
-      desc: 'Répertoire annonceurs & zones',
-    },
-    {
-      id: 'pricing',
-      label: 'Grille Tarifaire',
-      icon: DollarSign,
-      badge: null,
-      desc: 'Matrice de tarifs par Média x Client',
-    },
-    {
-      id: 'audit',
-      label: 'Journal d\'Audit',
-      icon: FileSpreadsheet,
-      badge: null,
-      desc: 'Historique des actions & traçabilité',
-    },
-    {
-      id: 'settings',
-      label: isSuperAdmin ? 'Paramètres & BDD SQL' : 'Paramètres & Thèmes',
-      icon: Settings,
-      badge: null,
-      desc: isSuperAdmin ? 'Supabase DDL, thèmes & administration' : 'Thèmes & raccourcis clavier',
-    },
+  const primaryItems = [
+    { id: 'dashboard', label: t('nav.overview'), icon: LayoutDashboard },
+    { id: 'events', label: t('nav.campaigns'), icon: CalendarDays, badge: events.length },
+    { id: 'payments', label: t('nav.payments'), icon: WalletCards, badge: mediaPayments.length },
+    { id: 'medias', label: t('nav.media'), icon: Radio },
   ];
 
+  const secondaryItems = [
+    { id: 'diffusions', label: t('nav.diffusions'), icon: Tv },
+    { id: 'pricing', label: t('nav.pricing'), icon: CreditCard },
+    { id: 'clients', label: t('nav.directory'), icon: SlidersHorizontal },
+    { id: 'settings', label: t('nav.settings'), icon: Settings2 },
+  ];
+
+  const renderItem = (item: typeof primaryItems[number]) => {
+    const Icon = item.icon;
+    const isActive = activeTab === item.id;
+    return (
+      <button
+        key={item.id}
+        onClick={() => setActiveTab(item.id)}
+        aria-current={isActive ? 'page' : undefined}
+        className={`sidebar-link ${isActive ? 'sidebar-link--active' : ''}`}
+      >
+        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span className="truncate">{item.label}</span>
+        {'badge' in item && typeof item.badge === 'number' && item.badge > 0 && <span className="sidebar-link__badge">{item.badge}</span>}
+      </button>
+    );
+  };
+
   return (
-    <aside className="w-64 shrink-0 bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 flex flex-col justify-between text-slate-200 select-none shadow-2xl min-h-[calc(100vh-100px)]">
-      {/* Brand Header */}
-      <div className="pb-4 mb-2 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-sky-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 ring-1 ring-white/20">
-            <Zap className="w-5 h-5 fill-current" />
-          </div>
-          <div>
-            <h1 className="font-extrabold text-white text-base tracking-tight leading-none flex items-center gap-1.5">
-              <span>MEDIA</span>
-              <span className="text-blue-400 font-mono text-xs px-1.5 py-0.5 bg-blue-500/20 rounded border border-blue-500/30">SAAS</span>
-            </h1>
-            <p className="text-[11px] text-slate-400 mt-1 font-medium">Gestion des Campagnes Média</p>
-          </div>
+    <aside className="sidebar" aria-label={t('nav.workspace')}>
+      <div className="sidebar__brand">
+        <div className="sidebar__brand-mark" aria-hidden="true">B</div>
+        <div>
+          <p className="sidebar__brand-name">{t('brand.name')}</p>
+          <p className="sidebar__brand-subtitle">{t('brand.subtitle')}</p>
         </div>
       </div>
 
-      {/* Navigation List */}
-      <nav className="space-y-1 overflow-y-auto flex-1 pr-1">
-        <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-400/90">
-          Espaces de Travail
-        </div>
-
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 group text-left ${
-                isActive
-                  ? 'bg-blue-500/20 border border-blue-500/30 text-blue-300 shadow-lg shadow-blue-500/10 font-semibold'
-                  : 'hover:bg-white/5 text-slate-400 hover:text-white border border-transparent'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Icon
-                  className={`w-4 h-4 transition-transform group-hover:scale-110 ${
-                    isActive ? 'text-blue-300' : 'text-slate-400 group-hover:text-blue-400'
-                  }`}
-                />
-                <div className="text-xs">
-                  <div className="leading-tight">{item.label}</div>
-                </div>
-              </div>
-
-              {item.badge !== null && (
-                <span
-                  className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded-full border transition-all ${
-                    isActive
-                      ? 'bg-blue-500 text-white border-blue-400 shadow-sm'
-                      : 'bg-white/10 text-slate-300 border-white/10'
-                  }`}
-                >
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
+      <nav className="sidebar__nav">
+        <p className="sidebar__label">{t('nav.workspace')}</p>
+        <div className="sidebar__group">{primaryItems.map(renderItem)}</div>
+        <p className="sidebar__label sidebar__label--secondary">{t('nav.more')}</p>
+        <div className="sidebar__group">{secondaryItems.map(renderItem)}</div>
       </nav>
 
-      {/* Footer System Status Card */}
-      <div className="p-3 border-t border-white/10">
-        <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-xs backdrop-blur-md">
-          <div className="flex items-center justify-between text-slate-300 font-medium mb-1">
-            <span className="flex items-center gap-1.5 text-[11px]">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-              Calculs Auto Actifs
-            </span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          </div>
-          <p className="text-[10px] text-slate-400 leading-normal">
-            Moteur de calcul de tarif média & montants restants synchronisé en temps réel.
-          </p>
-        </div>
+      <div className="sidebar__footer">
+        <span className="sidebar__status-dot" aria-hidden="true" />
+        <span>{t('status.connected')}</span>
       </div>
     </aside>
   );
