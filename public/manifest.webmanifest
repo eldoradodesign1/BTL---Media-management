@@ -1,0 +1,26 @@
+{
+  "name": "BTL Media — Pilotage des campagnes",
+  "short_name": "BTL Media",
+  "description": "Pilotage des campagnes, diffusions, médias, tarifs et paiements BTL.",
+  "lang": "fr-FR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#0a0f1b",
+  "background_color": "#0a0f1b",
+  "icons": [
+    {
+      "src": "./icons/btl-media-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/btl-media-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

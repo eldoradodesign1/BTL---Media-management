@@ -30,19 +30,21 @@ export const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-64 shrink-0 bg-slate-950/72 backdrop-blur-2xl border border-white/12 rounded-2xl p-4 flex flex-col text-slate-100 shadow-2xl min-h-[calc(100vh-100px)]">
-      <div className="pb-4 mb-2 border-b border-white/10">
+    <aside className="btl-sidebar w-64 shrink-0 p-4 flex flex-col text-slate-100 min-h-[calc(100vh-100px)]">
+      <div className="pb-4 mb-3 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-sky-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 ring-1 ring-white/20"><Zap className="w-5 h-5 fill-current" /></div>
+          <div className="btl-brand-mark w-10 h-10 rounded-[14px] flex items-center justify-center text-slate-950 ring-1 ring-white/15">
+            <Zap className="w-[18px] h-[18px] fill-current" />
+          </div>
           <div>
-            <h1 className="font-extrabold text-white text-base tracking-tight leading-none">BTL Media</h1>
-            <p className="text-[11px] text-slate-300 mt-1 font-medium">Pilotage des campagnes</p>
+            <h1 className="font-bold text-white text-[15px] tracking-[-0.02em] leading-none">BTL Media</h1>
+            <p className="text-[11px] text-slate-400 mt-1.5 font-medium">Pilotage des campagnes</p>
           </div>
         </div>
       </div>
 
       <nav className="space-y-1 overflow-y-auto flex-1 pr-1" aria-label="Navigation principale">
-        <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-sky-300">Espace de travail</p>
+        <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Espace de travail</p>
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -52,17 +54,17 @@ export const Sidebar: React.FC = () => {
               type="button"
               onClick={() => setActiveTab(item.id)}
               aria-current={isActive ? 'page' : undefined}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors duration-150 group text-left ${isActive ? 'bg-blue-500/22 border border-blue-400/40 text-white shadow-lg shadow-blue-500/10 font-semibold' : 'hover:bg-white/8 text-slate-200 hover:text-white border border-transparent'}`}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left border border-transparent ${isActive ? 'text-white font-semibold' : 'text-slate-400 hover:text-slate-100'}`}
             >
-              <span className="flex items-center gap-3"><Icon className={`w-4 h-4 ${isActive ? 'text-sky-300' : 'text-slate-400 group-hover:text-sky-300'}`} /><span className="text-xs leading-tight">{item.label}</span></span>
-              {item.badge !== null && <span className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded-full border ${isActive ? 'bg-blue-500 text-white border-blue-300' : 'bg-white/10 text-slate-100 border-white/15'}`}>{item.badge}</span>}
+              <span className="flex items-center gap-3"><Icon className={`w-[17px] h-[17px] ${isActive ? 'text-[var(--btl-lilac)]' : 'text-slate-500'}`} /><span className="text-xs leading-tight">{item.label}</span></span>
+              {item.badge !== null && <span className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded-full border ${isActive ? 'bg-white/10 text-white border-white/15' : 'bg-white/5 text-slate-500 border-white/10'}`}>{item.badge}</span>}
             </button>
           );
         })}
       </nav>
 
-      <div className="mt-3 px-3 pt-3 border-t border-white/10 text-[10px] text-slate-300 flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-emerald-400" aria-hidden="true" />
+      <div className="mt-3 px-3 pt-3 border-t border-white/10 text-[10px] text-slate-500 flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--btl-mint)]" aria-hidden="true" />
         <span>Calculs synchronisés</span>
       </div>
     </aside>

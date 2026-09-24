@@ -74,7 +74,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
   const roleInfo = getRoleBadge(currentUser.role);
 
   return (
-    <header className="sticky top-2 z-40 w-full backdrop-blur-2xl bg-white/5 border border-white/10 rounded-2xl p-3 px-4 flex items-center justify-between text-slate-100 shadow-2xl transition-all">
+    <header className="btl-topbar sticky top-2 z-40 w-full flex items-center justify-between text-slate-100 transition-all">
       {/* Left Search Bar */}
       <div className="flex items-center gap-3 flex-1 max-w-md">
         <div className="relative w-full">
