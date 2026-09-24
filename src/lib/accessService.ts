@@ -7,7 +7,7 @@ const ROLE_MAP: Record<string, UserRole> = {
   admin: 'admin',
   sub_admin: 'sub_admin',
   supervisor: 'supervisor',
-  agent: 'operations',
+  operation: 'operations',
   operations: 'operations',
 };
 
