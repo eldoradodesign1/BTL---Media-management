@@ -1,45 +1,12 @@
 -- =========================================================
--- MEDIA CAMPAIGN MANAGER - SUPABASE & POSTGRESQL SCHEMA DDL
+-- BTL MEDIA - BASE METIER SUPABASE & POSTGRESQL SCHEMA DDL
 -- Normalized Architecture for Enterprise Campaign Tracking
 -- =========================================================
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. ROLES & PERMISSIONS
-CREATE TABLE IF NOT EXISTS roles (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  code VARCHAR(50) UNIQUE NOT NULL,
-  name VARCHAR(100) NOT NULL,
-  description TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-INSERT INTO roles (code, name, description) VALUES
-('admin', 'Administrateur Général', 'Accès complet à la configuration, validation et exports'),
-('media_manager', 'Responsable Média', 'Gestion des campagnes, événements et diffusions'),
-('finance', 'Responsable Financier', 'Gestion des paiements et validation des montants'),
-('auditor', 'Auditeur / Consultation', 'Accès en lecture seule et rapports d''audit')
-ON CONFLICT (code) DO NOTHING;
-
--- 2. USERS
-CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  email VARCHAR(255) UNIQUE NOT NULL,
-  full_name VARCHAR(150) NOT NULL,
-  role_id UUID REFERENCES roles(id) ON DELETE SET NULL,
-  avatar_url TEXT,
-  client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
-  password VARCHAR(255) DEFAULT '123456',
-  status VARCHAR(20) DEFAULT 'active',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Commandes de migration pour bases existantes :
--- ALTER TABLE users ADD COLUMN IF NOT EXISTS password VARCHAR(255) DEFAULT '123456';
--- ALTER TABLE users ADD COLUMN IF NOT EXISTS client_id UUID;
-
--- 3. REGIONS
+-- 1. REGIONS
 CREATE TABLE IF NOT EXISTS regions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name VARCHAR(100) NOT NULL,
@@ -124,7 +91,7 @@ CREATE TABLE IF NOT EXISTS pricing_versions (
   rate_type VARCHAR(20) DEFAULT 'catalog',
   rate_amount NUMERIC(12, 2) NOT NULL,
   version INT NOT NULL,
-  changed_by UUID REFERENCES users(id),
+  changed_by UUID,
   changed_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -210,7 +177,7 @@ CREATE TABLE IF NOT EXISTS attachments (
   file_url TEXT NOT NULL,
   file_size INT,
   mime_type VARCHAR(100),
-  uploaded_by UUID REFERENCES users(id),
+  uploaded_by UUID,
   uploaded_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -219,7 +186,7 @@ CREATE TABLE IF NOT EXISTS comments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   entity_type VARCHAR(50) NOT NULL,
   entity_id UUID NOT NULL,
-  user_id UUID REFERENCES users(id),
+  user_id UUID,
   message TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -227,7 +194,7 @@ CREATE TABLE IF NOT EXISTS comments (
 -- 14. AUDIT LOGS
 CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES users(id),
+  user_id UUID,
   action VARCHAR(50) NOT NULL,
   entity_type VARCHAR(50) NOT NULL,
   entity_id UUID,
@@ -267,4 +234,4 @@ ALTER TABLE media_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE media_payments ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Enable read access for authenticated users" ON events FOR SELECT USING (true);
-CREATE POLICY "Enable insert/update for media_manager and admin" ON events FOR ALL USING (auth.role() IN ('authenticated'));
+CREATE POLICY "Enable insert/update for BTL team" ON events FOR ALL USING (auth.role() IN ('authenticated'));

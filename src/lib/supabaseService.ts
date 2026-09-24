@@ -10,10 +10,7 @@ import {
   MediaPayment,
   AuditLog,
   PurchaseOrder,
-  User,
-  UserRole,
-  RateType,
-  UserShortcut
+  RateType
 } from '../types';
 
 /**
@@ -173,9 +170,7 @@ export const supabaseService = {
         { data: mediaEvents, error: errMe },
         { data: mediaPayments, error: errPay },
         { data: purchaseOrders, error: errPo },
-        { data: auditLogs, error: errAud },
-        { data: users, error: errUsr },
-        { data: roles, error: errRol }
+        { data: auditLogs, error: errAud }
       ] = await Promise.all([
         supabase.from('regions').select('*'),
         supabase.from('clients').select('*'),
@@ -186,61 +181,14 @@ export const supabaseService = {
         supabase.from('media_events').select('*'),
         supabase.from('media_payments').select('*'),
         supabase.from('purchase_orders').select('*'),
-        supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100),
-        supabase.from('users').select('*'),
-        supabase.from('roles').select('*')
+        supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100)
       ]);
 
-      if (errReg || errCli || errMed || errEvt || errUsr) {
-        console.warn('Supabase fetch warnings:', { errReg, errCli, errMed, errEvt, errUsr });
+      if (errReg || errCli || errMed || errEvt) {
+        console.warn('Supabase business data warnings:', { errReg, errCli, errMed, errEvt });
       }
 
-      const roleCodeMap: Record<string, UserRole> = {
-        'SUPER_ADMIN': 'super-admin',
-        'ADMIN': 'admin',
-        'RESP_FINANCE': 'finance',
-        'RESP_MEDIA': 'media_manager',
-        'CLIENT': 'client',
-        'AUDITOR': 'auditor',
-        'AUDITEUR': 'auditor'
-      };
-
-      const mappedUsers: User[] | undefined = users?.map(u => {
-        const roleObj = roles?.find((r: any) => r.id === u.role_id);
-        const rawCode = (roleObj?.code || u.role_code || u.role || 'ADMIN').toUpperCase();
-        const role: UserRole = roleCodeMap[rawCode] || (rawCode.toLowerCase().replace('_', '-') as UserRole) || 'admin';
-
-        let clientId = u.client_id || undefined;
-        if (!clientId && role === 'client' && clients) {
-          const uName = (u.full_name || u.name || '').toLowerCase();
-          const uEmail = (u.email || '').toLowerCase();
-          const matchedCli = clients.find((c: any) => {
-            const cName = (c.name || '').toLowerCase();
-            const cEmail = (c.email || '').toLowerCase();
-            return (
-              (cName && uName && (cName.includes(uName) || uName.includes(cName))) ||
-              (cEmail && uEmail && cEmail === uEmail)
-            );
-          });
-          if (matchedCli) {
-            clientId = matchedCli.id;
-          }
-        }
-
-        return {
-          id: u.id,
-          name: u.full_name || u.name || u.email,
-          email: u.email || '',
-          role: role,
-          avatar: u.avatar_url || u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(u.full_name || u.email)}`,
-          clientId: clientId,
-          password: u.password || '123456'
-        };
-      });
-
       return {
-        users: mappedUsers,
-
         regions: regions?.map(r => ({
           id: r.id,
           name: r.name,
@@ -662,139 +610,4 @@ export const supabaseService = {
     }
   },
 
-  // Update User Profile in Supabase
-  async updateUserProfile(userId: string, data: { name?: string; email?: string; avatar?: string; password?: string; clientId?: string }) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return { success: false, message: 'Supabase non configuré.' };
-
-    try {
-      const payload: Record<string, any> = {};
-      if (data.name !== undefined) payload.full_name = data.name;
-      if (data.email !== undefined) payload.email = data.email;
-      if (data.avatar !== undefined) payload.avatar_url = data.avatar;
-      if (data.password !== undefined) payload.password = data.password;
-      if (data.clientId !== undefined) payload.client_id = data.clientId;
-
-      const { error } = await supabase.from('users').update(payload).eq('id', userId);
-      if (error) {
-        console.error('Erreur mise à jour utilisateur Supabase:', error);
-        return { success: false, message: error.message };
-      }
-      return { success: true };
-    } catch (err: any) {
-      return { success: false, message: err.message || 'Impossible de mettre à jour le profil.' };
-    }
-  },
-
-  // Save / Upsert Single User
-  async saveUser(user: User) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return false;
-
-    try {
-      const { data: roles } = await supabase.from('roles').select('*');
-      let roleId = null;
-      if (roles) {
-        const targetCode = user.role.toUpperCase().replace('-', '_');
-        const matchedRole = roles.find((r: any) => r.code === targetCode || r.code.toLowerCase() === user.role.toLowerCase());
-        if (matchedRole) roleId = matchedRole.id;
-      }
-
-      await upsertWithFallback('users', {
-        id: user.id,
-        email: user.email,
-        full_name: user.name,
-        role_id: roleId,
-        avatar_url: user.avatar,
-        client_id: user.clientId || null,
-        password: user.password || '123456'
-      });
-      return true;
-    } catch (err) {
-      console.error('Erreur sauvegarde utilisateur Supabase:', err);
-      return false;
-    }
-  },
-
-  // Password Reset Requests Table Sync
-  async savePasswordResetRequest(req: { id: string; email: string; userName?: string; reason?: string; status: string; createdAt: string }) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return false;
-
-    try {
-      await upsertWithFallback('password_reset_requests', {
-        id: req.id,
-        email: req.email,
-        user_name: req.userName || req.email,
-        reason: req.reason || '',
-        status: req.status || 'En attente',
-        created_at: req.createdAt || new Date().toISOString()
-      });
-      return true;
-    } catch (err) {
-      console.error('Erreur sauvegarde demande mot de passe Supabase:', err);
-      return false;
-    }
-  },
-
-  async loadPasswordResetRequests() {
-    const supabase = getSupabaseClient();
-    if (!supabase) return [];
-
-    try {
-      const { data, error } = await supabase.from('password_reset_requests').select('*').order('created_at', { ascending: false });
-      if (error || !data) return [];
-      return data.map((item: any) => ({
-        id: item.id,
-        email: item.email,
-        userName: item.user_name || item.email,
-        reason: item.reason || '',
-        status: item.status || 'En attente',
-        createdAt: item.created_at
-      }));
-    } catch (err) {
-      console.error('Erreur chargement demandes mot de passe Supabase:', err);
-      return [];
-    }
-  },
-
-  // User Shortcuts Table Sync
-  async loadUserShortcuts(userId: string): Promise<UserShortcut[]> {
-    const supabase = getSupabaseClient();
-    if (!supabase || !userId) return [];
-
-    try {
-      const { data, error } = await supabase.from('user_shortcuts').select('*').eq('user_id', userId);
-      if (error || !data) return [];
-      return data.map((item: any) => ({
-        id: item.id,
-        userId: item.user_id,
-        actionId: item.action_id,
-        keys: item.keys
-      }));
-    } catch (err) {
-      console.error('Erreur chargement raccourcis utilisateur Supabase:', err);
-      return [];
-    }
-  },
-
-  async saveUserShortcut(shortcut: UserShortcut): Promise<boolean> {
-    const supabase = getSupabaseClient();
-    if (!supabase) return false;
-
-    try {
-      await upsertWithFallback('user_shortcuts', {
-        id: shortcut.id || `sc-${shortcut.userId}-${shortcut.actionId}`,
-        user_id: shortcut.userId,
-        action_id: shortcut.actionId,
-        keys: shortcut.keys
-      });
-      return true;
-    } catch (err) {
-      console.error('Erreur sauvegarde raccourci utilisateur Supabase:', err);
-      return false;
-    }
-  }
 };
-
-

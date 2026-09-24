@@ -41,7 +41,7 @@ export const DashboardView: React.FC = () => {
   } = useApp();
 
   // Filters State
-  const isClientRole = currentUser?.role === 'client';
+  const isClientRole = false;
   const defaultClientId = isClientRole ? (currentUser?.clientId || clients[0]?.id || 'all') : 'all';
 
   const [selectedClientId, setSelectedClientId] = useState<string>(defaultClientId);
@@ -566,7 +566,7 @@ export const DashboardView: React.FC = () => {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3 justify-end">
-          {(!isClientRole || currentUser?.role === 'super-admin' || currentUser?.role === 'admin' || currentUser?.role === 'finance') && (
+          {(!isClientRole || ['super-admin', 'admin', 'sub_admin', 'operations'].includes(currentUser?.role || '')) && (
             <button
               onClick={() => setIsPoModalOpen(true)}
               className="px-4 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-2 shadow-xl shadow-blue-600/25 transition-all hover:scale-[1.02] active:scale-[0.98]"

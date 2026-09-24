@@ -46,7 +46,7 @@ export const MediaEventsView: React.FC<MediaEventsViewProps> = ({ onOpenAddModal
   const [deletingRow, setDeletingRow] = useState<MediaByEvent | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  const isClient = currentUser?.role === 'client';
+  const isClient = false;
 
   // Filtered dataset
   const filteredList = useMemo(() => {

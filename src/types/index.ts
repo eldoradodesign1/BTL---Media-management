@@ -1,11 +1,12 @@
 export type AppTheme = 'dark' | 'light' | 'classic';
 
-export type UserRole = 'super-admin' | 'admin' | 'media_manager' | 'finance' | 'auditor' | 'client';
+export type UserRole = 'super-admin' | 'admin' | 'sub_admin' | 'supervisor' | 'operations';
 
 export interface User {
   id: string;
   name: string;
-  email: string;
+  email?: string;
+  phone?: string;
   role: UserRole;
   avatar: string;
   clientId?: string;
@@ -253,5 +254,4 @@ export const DEFAULT_SHORTCUT_ACTIONS: ShortcutActionDef[] = [
     category: 'general'
   }
 ];
-
 

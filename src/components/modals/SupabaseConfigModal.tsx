@@ -58,15 +58,9 @@ export const SupabaseConfigModal: React.FC<SupabaseConfigModalProps> = ({ isOpen
   };
 
   const handleCopySql = () => {
-    const sqlSchema = `-- MEDIA CAMPAIGN MANAGER - SUPABASE SCHEMA (Compatible with String & UUID IDs)
+    const sqlSchema = `-- BTL MEDIA - BASE METIER HISTORIQUE (Compatible with String & UUID IDs)
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-CREATE TABLE IF NOT EXISTS roles (id VARCHAR(100) PRIMARY KEY, code VARCHAR(50) UNIQUE NOT NULL, name VARCHAR(100) NOT NULL, description TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
-CREATE TABLE IF NOT EXISTS users (id VARCHAR(100) PRIMARY KEY, email VARCHAR(255) UNIQUE NOT NULL, full_name VARCHAR(150) NOT NULL, role_id VARCHAR(100), avatar_url TEXT, client_id VARCHAR(100), password VARCHAR(255) DEFAULT '123456', status VARCHAR(20) DEFAULT 'active', created_at TIMESTAMPTZ DEFAULT NOW());
-
--- Migration pour utilisateurs :
-ALTER TABLE users ADD COLUMN IF NOT EXISTS password VARCHAR(255) DEFAULT '123456';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS client_id VARCHAR(100);
 CREATE TABLE IF NOT EXISTS regions (id VARCHAR(100) PRIMARY KEY, name VARCHAR(100) NOT NULL, code VARCHAR(10) UNIQUE NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS clients (id VARCHAR(100) PRIMARY KEY, name VARCHAR(150) NOT NULL, code VARCHAR(20) UNIQUE NOT NULL, contact_person VARCHAR(100), email VARCHAR(150), phone VARCHAR(50), created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS media_types (id VARCHAR(100) PRIMARY KEY, code VARCHAR(50) UNIQUE NOT NULL, label VARCHAR(100) NOT NULL, icon VARCHAR(50));
@@ -86,8 +80,6 @@ CREATE TABLE IF NOT EXISTS purchase_orders (id VARCHAR(100) PRIMARY KEY, po_numb
 CREATE TABLE IF NOT EXISTS audit_logs (id VARCHAR(100) PRIMARY KEY, user_id VARCHAR(100), user_name VARCHAR(150), action VARCHAR(50) NOT NULL, entity_type VARCHAR(50) NOT NULL, entity_id VARCHAR(100), details TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 
 -- Enable RLS and add public access policies
-ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE regions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE focal_points ENABLE ROW LEVEL SECURITY;
@@ -99,10 +91,6 @@ ALTER TABLE media_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Public Roles" ON roles;
-CREATE POLICY "Public Roles" ON roles FOR ALL USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Public Users" ON users;
-CREATE POLICY "Public Users" ON users FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Public Regions" ON regions;
 CREATE POLICY "Public Regions" ON regions FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Public Clients" ON clients;
@@ -178,10 +166,10 @@ CREATE POLICY "Public Audit" ON audit_logs FOR ALL USING (true) WITH CHECK (true
             </div>
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
-                Base de Données Supabase (Unique Source)
+                Base métier Supabase (historique BTL)
               </h2>
               <p className="text-xs text-slate-400">
-                Connectez votre projet Supabase PostgreSQL pour centraliser vos données
+                Cette connexion sert uniquement aux régions, clients, médias, campagnes, tarifs et paiements BTL.
               </p>
             </div>
           </div>

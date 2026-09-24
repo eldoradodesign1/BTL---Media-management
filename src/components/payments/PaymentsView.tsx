@@ -31,7 +31,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ onOpenAddModal }) =>
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<string>('Tous');
 
-  const isClient = currentUser?.role === 'client';
+  const isClient = false;
 
   const filteredPayments = mediaPayments.filter((p) => {
     if (selectedMethod !== 'Tous' && p.paymentMethod !== selectedMethod) return false;

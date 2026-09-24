@@ -32,6 +32,8 @@ import {
 } from '../data/mockData';
 import { supabaseService } from '../lib/supabaseService';
 import { getSupabaseConfig } from '../lib/supabase';
+import { accessService } from '../lib/accessService';
+import { getAccessSupabaseConfig } from '../lib/accessSupabase';
 
 // Background images generated for themes
 import darkBg from '../assets/images/bg_dark_smoke_1786007004233.jpg';
@@ -56,10 +58,10 @@ interface AppContextType {
   setCurrentUser: (u: User) => void;
   users: User[];
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
-  requestPasswordReset: (email: string, reason?: string) => Promise<{ success: boolean; message: string }>;
+  login: (identifier: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  requestPasswordReset: (identifier: string, reason?: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
-  updateUserProfile: (data: { name?: string; email?: string; avatar?: string; password?: string; clientId?: string }) => Promise<{ success: boolean; message?: string }>;
+  updateUserProfile: (data: { name?: string; phone?: string; avatar?: string; password?: string; clientId?: string }) => Promise<{ success: boolean; message?: string }>;
   isProfileModalOpen: boolean;
   setIsProfileModalOpen: (open: boolean) => void;
   isAuthModalOpen: boolean;
@@ -162,50 +164,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // User & Auth State
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('mcm_users');
-    if (saved) {
-      try {
-        const parsed: User[] = JSON.parse(saved);
-        const realOnly = parsed.filter(u => !u.id.startsWith('u0') && !u.id.startsWith('u1') && !u.id.startsWith('u2') && !u.id.startsWith('u3') && !u.id.startsWith('u4') && !u.id.startsWith('u5'));
-        if (realOnly.length > 0) return realOnly;
-      } catch (e) {
-        // ignore parse error
-      }
-    }
-    return [];
-  });
+  const [users, setUsers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<User>(() => ({
+    id: 'anonymous',
+    name: 'Connexion requise',
+    email: '',
+    phone: '',
+    role: 'operations',
+    avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=BTL'
+  }));
 
-  const [currentUser, setCurrentUser] = useState<User>(() => {
-    const savedId = localStorage.getItem('mcm_authenticated_user_id');
-    const saved = localStorage.getItem('mcm_users');
-    let realUsers: User[] = [];
-    if (saved) {
-      try {
-        const parsed: User[] = JSON.parse(saved);
-        realUsers = parsed.filter(u => !u.id.startsWith('u0') && !u.id.startsWith('u1') && !u.id.startsWith('u2') && !u.id.startsWith('u3') && !u.id.startsWith('u4') && !u.id.startsWith('u5'));
-      } catch (e) {}
-    }
-
-    if (savedId && realUsers.length > 0) {
-      const found = realUsers.find(u => u.id === savedId);
-      if (found) return found;
-    }
-    if (realUsers.length > 0) return realUsers[0];
-
-    // Placeholder temporaire avant le chargement Supabase
-    return {
-      id: 'default-admin',
-      name: 'Administrateur Supabase',
-      email: 'admin@btl-agency.cd',
-      role: 'super-admin',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin'
-    };
-  });
-
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return true; // Active par défaut, peut être déconnecté via l'IHM
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => Boolean(localStorage.getItem('mcm_authenticated_user_id')));
 
   // Navigation & Modals
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -215,7 +184,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState<boolean>(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean>(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => !Boolean(localStorage.getItem('mcm_authenticated_user_id')));
 
   // Core Data loaded from localStorage or empty when Supabase is active
   const isDbConfigured = getSupabaseConfig().isConfigured;
@@ -326,7 +295,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
 
-    const remoteData = await supabaseService.loadAllData();
+    const [remoteData, accessUsers] = await Promise.all([
+      supabaseService.loadAllData(),
+      accessService.loadUsers(),
+    ]);
     if (!remoteData) {
       setIsSupabaseConnected(false);
       return false;
@@ -334,17 +306,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setIsSupabaseConnected(true);
 
-    if (remoteData.users !== undefined) {
-      setUsers(remoteData.users);
-      localStorage.setItem('mcm_users', JSON.stringify(remoteData.users));
-
-      if (remoteData.users.length > 0) {
-        // Sync active current user with updated remote profile if available
-        setCurrentUser(prevUser => {
-          const matched = remoteData.users!.find(u => u.id === prevUser.id || (u.email && prevUser.email && u.email.toLowerCase() === prevUser.email.toLowerCase()));
-          return matched || remoteData.users![0];
-        });
-      }
+    setUsers(accessUsers);
+    const savedAccessUserId = localStorage.getItem('mcm_authenticated_user_id');
+    const authenticatedAccessUser = savedAccessUserId
+      ? accessUsers.find((user) => user.id === savedAccessUserId)
+      : undefined;
+    if (authenticatedAccessUser) {
+      setCurrentUser(authenticatedAccessUser);
+      setIsAuthenticated(true);
+      setIsAuthModalOpen(false);
+    } else {
+      localStorage.removeItem('mcm_authenticated_user_id');
+      setIsAuthenticated(false);
+      setIsAuthModalOpen(true);
     }
 
     setRegions(remoteData.regions || []);
@@ -358,7 +332,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPurchaseOrders(remoteData.purchaseOrders || []);
     setAuditLogs(remoteData.auditLogs || []);
 
-    const resetReqs = await supabaseService.loadPasswordResetRequests();
+    const resetReqs = await accessService.loadPasswordResetRequests();
     if (resetReqs && resetReqs.length > 0) {
       setPasswordResetRequests(resetReqs);
     }
@@ -367,11 +341,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // Authentication & Profile Actions
-  const login = useCallback(async (email: string, pass: string) => {
-    const targetEmail = email.trim().toLowerCase();
-    const matched = users.find(u => u.email.toLowerCase() === targetEmail);
+  const login = useCallback(async (identifier: string, pass: string) => {
+    const matched = accessService.findByIdentifier(users, identifier);
     if (!matched) {
-      return { success: false, message: 'Aucun utilisateur trouvé avec cette adresse email.' };
+      return { success: false, message: 'Aucun compte autorisé trouvé avec cet identifiant.' };
     }
     const expectedPass = matched.password || '123456';
     if (pass !== expectedPass) {
@@ -389,14 +362,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true };
   }, [users, addNotification]);
 
-  const requestPasswordReset = useCallback(async (email: string, reason?: string) => {
-    const targetEmail = email.trim().toLowerCase();
-    const matched = users.find(u => u.email.toLowerCase() === targetEmail);
-    const userName = matched ? matched.name : targetEmail;
+  const requestPasswordReset = useCallback(async (identifier: string, reason?: string) => {
+    const matched = accessService.findByIdentifier(users, identifier);
+    const targetIdentifier = matched?.phone || identifier.trim();
+    const userName = matched ? matched.name : targetIdentifier;
 
     const newReq: PasswordResetRequest = {
       id: 'req-' + Date.now(),
-      email: targetEmail,
+      email: targetIdentifier,
       userName,
       reason: reason || 'Mot de passe oublié',
       status: 'En attente',
@@ -405,7 +378,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setPasswordResetRequests(prev => [newReq, ...prev]);
     localStorage.setItem('mcm_password_resets', JSON.stringify([newReq, ...passwordResetRequests]));
-    supabaseService.savePasswordResetRequest(newReq);
+    accessService.savePasswordResetRequest(newReq);
 
     addNotification({
       type: 'warning',
@@ -413,7 +386,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       message: `Requête enregistrée en base pour ${userName}. Notification transmise au SuperAdmin.`
     });
 
-    logAuditAction('Modification', 'Sécurité', `Demande de réinitialisation de mot de passe par ${userName} (${targetEmail}). Motif: ${reason || 'Mot de passe oublié'}`);
+    logAuditAction('Modification', 'Sécurité', `Demande de réinitialisation de mot de passe par ${userName} (${targetIdentifier}). Motif: ${reason || 'Mot de passe oublié'}`);
     return { success: true, message: 'Demande transmise avec succès et enregistrée en base de données.' };
   }, [users, addNotification, logAuditAction, passwordResetRequests]);
 
@@ -427,13 +400,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [addNotification]);
 
-  const updateUserProfile = useCallback(async (data: { name?: string; email?: string; avatar?: string; password?: string; clientId?: string }) => {
+  const updateUserProfile = useCallback(async (data: { name?: string; phone?: string; avatar?: string; password?: string; clientId?: string }) => {
     if (!currentUser) return { success: false, message: 'Aucun utilisateur actif' };
 
     const updatedUser: User = {
       ...currentUser,
       ...(data.name ? { name: data.name } : {}),
-      ...(data.email ? { email: data.email } : {}),
+      ...(data.phone ? { phone: data.phone } : {}),
       ...(data.avatar ? { avatar: data.avatar } : {}),
       ...(data.password ? { password: data.password } : {}),
       ...(data.clientId ? { clientId: data.clientId } : {}),
@@ -443,7 +416,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
 
     // Save to Supabase
-    const res = await supabaseService.updateUserProfile(currentUser.id, data);
+    const res = await accessService.updateUserProfile(currentUser.id, data);
     if (res.success) {
       addNotification({
         type: 'success',
@@ -615,8 +588,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (e) {}
     }
 
-    if (getSupabaseConfig().isConfigured) {
-      supabaseService.loadUserShortcuts(currentUser.id).then((scs) => {
+    if (getAccessSupabaseConfig().isConfigured) {
+      accessService.loadUserShortcuts(currentUser.id).then((scs) => {
         if (scs && scs.length > 0) {
           setUserShortcuts(scs);
           localStorage.setItem(`mcm_user_shortcuts_${currentUser.id}`, JSON.stringify(scs));
@@ -645,8 +618,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUserShortcuts(updatedList);
     localStorage.setItem(`mcm_user_shortcuts_${currentUser.id}`, JSON.stringify(updatedList));
 
-    if (getSupabaseConfig().isConfigured) {
-      await supabaseService.saveUserShortcut(newShortcut);
+    if (getAccessSupabaseConfig().isConfigured) {
+      await accessService.saveUserShortcut(newShortcut);
     }
 
     addNotification({
@@ -959,7 +932,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     const targetReq = passwordResetRequests.find(r => r.id === id);
     if (targetReq) {
-      supabaseService.savePasswordResetRequest({ ...targetReq, status: newStatus });
+      accessService.savePasswordResetRequest({ ...targetReq, status: newStatus });
     }
     addNotification({
       type: newStatus === 'Résolu' ? 'success' : 'info',

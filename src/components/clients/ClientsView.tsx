@@ -31,7 +31,7 @@ export const ClientsView: React.FC = () => {
   const [deletingPo, setDeletingPo] = useState<PurchaseOrder | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  const canManagePo = currentUser?.role === 'super-admin' || currentUser?.role === 'admin' || currentUser?.role === 'finance';
+  const canManagePo = ['super-admin', 'admin', 'sub_admin', 'operations'].includes(currentUser?.role || '');
 
   const handleOpenAddPo = (clientId?: string) => {
     setEditingPo(null);

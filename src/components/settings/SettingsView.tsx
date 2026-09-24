@@ -41,18 +41,12 @@ export const SettingsView: React.FC = () => {
   const isSuperAdmin = currentUser?.role === 'super-admin';
 
   const sqlSchemaText = `-- =========================================================
--- MEDIA CAMPAIGN MANAGER - SUPABASE & POSTGRESQL SCHEMA DDL
+-- BTL MEDIA - BASE METIER HISTORIQUE SUPABASE & POSTGRESQL DDL
 -- Flexible Architecture (Supports string & UUID IDs with RLS)
 -- =========================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-CREATE TABLE IF NOT EXISTS roles (id VARCHAR(100) PRIMARY KEY, code VARCHAR(50) UNIQUE NOT NULL, name VARCHAR(100) NOT NULL, description TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
-CREATE TABLE IF NOT EXISTS users (id VARCHAR(100) PRIMARY KEY, email VARCHAR(255) UNIQUE NOT NULL, full_name VARCHAR(150) NOT NULL, role_id VARCHAR(100), avatar_url TEXT, client_id VARCHAR(100), password VARCHAR(255) DEFAULT '123456', status VARCHAR(20) DEFAULT 'active', created_at TIMESTAMPTZ DEFAULT NOW());
-
--- Migration pour utilisateurs :
-ALTER TABLE users ADD COLUMN IF NOT EXISTS password VARCHAR(255) DEFAULT '123456';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS client_id VARCHAR(100);
 CREATE TABLE IF NOT EXISTS regions (id VARCHAR(100) PRIMARY KEY, name VARCHAR(100) NOT NULL, code VARCHAR(10) UNIQUE NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS clients (id VARCHAR(100) PRIMARY KEY, name VARCHAR(150) NOT NULL, code VARCHAR(20) UNIQUE NOT NULL, contact_person VARCHAR(100), email VARCHAR(150), phone VARCHAR(50), created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS media_types (id VARCHAR(100) PRIMARY KEY, code VARCHAR(50) UNIQUE NOT NULL, label VARCHAR(100) NOT NULL, icon VARCHAR(50));
@@ -79,12 +73,7 @@ ON CONFLICT (code) DO NOTHING;
 CREATE TABLE IF NOT EXISTS media_payments (id VARCHAR(100) PRIMARY KEY, payment_date DATE NOT NULL DEFAULT CURRENT_DATE, media_id VARCHAR(100) NOT NULL, event_id VARCHAR(100) NOT NULL, client_id VARCHAR(100), focal_point_id VARCHAR(100), amount NUMERIC(12, 2) NOT NULL, payment_method VARCHAR(50) NOT NULL DEFAULT 'Virement', reference_no VARCHAR(100), notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS purchase_orders (id VARCHAR(100) PRIMARY KEY, po_number VARCHAR(100) NOT NULL, client_id VARCHAR(100) NOT NULL, amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00, support_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00, fpc_percent NUMERIC(5, 2) NOT NULL DEFAULT 5.00, agency_fees_percent NUMERIC(5, 2) NOT NULL DEFAULT 14.00, po_date DATE NOT NULL DEFAULT CURRENT_DATE, status VARCHAR(20) DEFAULT 'Actif', notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS audit_logs (id VARCHAR(100) PRIMARY KEY, user_id VARCHAR(100), user_name VARCHAR(150), action VARCHAR(50) NOT NULL, entity_type VARCHAR(50) NOT NULL, entity_id VARCHAR(100), details TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
-CREATE TABLE IF NOT EXISTS password_reset_requests (id VARCHAR(100) PRIMARY KEY, email VARCHAR(150) NOT NULL, user_name VARCHAR(150), reason TEXT, status VARCHAR(20) DEFAULT 'En attente', created_at TIMESTAMPTZ DEFAULT NOW());
-CREATE TABLE IF NOT EXISTS user_shortcuts (id VARCHAR(100) PRIMARY KEY, user_id VARCHAR(100) NOT NULL, action_id VARCHAR(100) NOT NULL, keys VARCHAR(50) NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(), CONSTRAINT unique_user_action_shortcut UNIQUE(user_id, action_id));
-
 -- Enable RLS and add public access policies
-ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE regions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE focal_points ENABLE ROW LEVEL SECURITY;
@@ -94,19 +83,12 @@ ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE media_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE media_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payment_categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_shortcuts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Public Payment Categories" ON payment_categories;
 CREATE POLICY "Public Payment Categories" ON payment_categories FOR ALL USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Public User Shortcuts" ON user_shortcuts;
-CREATE POLICY "Public User Shortcuts" ON user_shortcuts FOR ALL USING (true) WITH CHECK (true);
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Public Roles" ON roles;
-CREATE POLICY "Public Roles" ON roles FOR ALL USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Public Users" ON users;
-CREATE POLICY "Public Users" ON users FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Public Regions" ON regions;
 CREATE POLICY "Public Regions" ON regions FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Public Clients" ON clients;
@@ -235,7 +217,7 @@ CREATE POLICY "Public Audit" ON audit_logs FOR ALL USING (true) WITH CHECK (true
               <span>Raccourcis Clavier Personnalisés par Utilisateur</span>
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              Configuration individuelle enregistrée pour <strong className="text-cyan-300">{currentUser?.name}</strong> ({currentUser?.email}).
+              Configuration individuelle enregistrée pour <strong className="text-cyan-300">{currentUser?.name}</strong> ({currentUser?.phone || 'téléphone non renseigné'}).
             </p>
           </div>
 

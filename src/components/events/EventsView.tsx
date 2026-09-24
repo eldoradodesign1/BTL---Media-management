@@ -33,7 +33,7 @@ export const EventsView: React.FC<EventsViewProps> = ({ onOpenAddModal, onSelect
   const [deletingEvent, setDeletingEvent] = useState<CampaignEvent | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  const isClient = currentUser?.role === 'client';
+  const isClient = false;
 
   const filteredEvents = events.filter((e) => {
     if (globalSearchQuery.trim()) {

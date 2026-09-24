@@ -20,7 +20,7 @@ export const MediasView: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'medias' | 'focal_points'>('medias');
 
   // Permissions for editing media and focal points
-  const canManageMedia = currentUser?.role === 'super-admin' || currentUser?.role === 'admin' || currentUser?.role === 'media_manager';
+  const canManageMedia = ['super-admin', 'admin', 'sub_admin', 'operations'].includes(currentUser?.role || '');
 
   // Modals state
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);

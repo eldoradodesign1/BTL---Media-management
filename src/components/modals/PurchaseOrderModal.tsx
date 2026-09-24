@@ -26,8 +26,8 @@ export const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({
   const [status, setStatus] = useState<'Actif' | 'Clôturé' | 'En attente'>('Actif');
   const [notes, setNotes] = useState('');
 
-  const isAdminOrSuper = currentUser?.role === 'admin' || currentUser?.role === 'super-admin';
-  const isFinance = currentUser?.role === 'finance';
+  const isAdminOrSuper = currentUser?.role === 'admin' || currentUser?.role === 'super-admin' || currentUser?.role === 'sub_admin';
+  const isFinance = currentUser?.role === 'operations';
 
   useEffect(() => {
     if (editingPo) {

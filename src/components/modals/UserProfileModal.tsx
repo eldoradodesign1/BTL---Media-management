@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import {
   X,
   User as UserIcon,
-  Mail,
+  Phone,
   Lock,
   Key,
   ShieldCheck,
@@ -27,7 +27,7 @@ export const UserProfileModal: React.FC = () => {
   } = useApp();
 
   const [name, setName] = useState(currentUser?.name || '');
-  const [email, setEmail] = useState(currentUser?.email || '');
+  const [phone, setPhone] = useState(currentUser?.phone || '');
   const [avatar, setAvatar] = useState(currentUser?.avatar || '');
   const [password, setPassword] = useState(currentUser?.password || '123456');
   const [confirmPassword, setConfirmPassword] = useState(currentUser?.password || '123456');
@@ -42,7 +42,7 @@ export const UserProfileModal: React.FC = () => {
   // Preset avatar templates
   const presetAvatars = [
     `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name || 'Michael')}`,
-    `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(email || 'Sam')}`,
+    `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(phone || 'BTL')}`,
     `https://api.dicebear.com/7.x/avataaars/svg?seed=EldoMaster`,
     `https://api.dicebear.com/7.x/avataaars/svg?seed=MediaLead`,
     `https://api.dicebear.com/7.x/bottts/svg?seed=MediaBot`
@@ -75,8 +75,8 @@ export const UserProfileModal: React.FC = () => {
       return;
     }
 
-    if (!email.trim()) {
-      setStatusMessage({ type: 'error', text: "L'adresse email est obligatoire." });
+    if (!phone.trim()) {
+      setStatusMessage({ type: 'error', text: 'Le numéro de téléphone est obligatoire.' });
       return;
     }
 
@@ -90,7 +90,7 @@ export const UserProfileModal: React.FC = () => {
     try {
       const res = await updateUserProfile({
         name,
-        email,
+        phone,
         avatar,
         password,
         clientId: clientId || undefined
@@ -115,10 +115,9 @@ export const UserProfileModal: React.FC = () => {
     switch (role) {
       case 'super-admin': return 'Super Administrateur';
       case 'admin': return 'Administrateur Général';
-      case 'finance': return 'Responsable Financier';
-      case 'media_manager': return 'Responsable Média';
-      case 'client': return 'Client / Annonceur';
-      case 'auditor': return 'Auditeur';
+      case 'sub_admin': return 'Coordinateur';
+      case 'supervisor': return 'Superviseur';
+      case 'operations': return 'Opérations';
       default: return role;
     }
   };
@@ -290,47 +289,24 @@ export const UserProfileModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Email */}
+              {/* Phone */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Adresse Email
+                  Téléphone d’accès
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+                  <Phone className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
                   <input
-                    type="email"
+                    type="tel"
                     required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-xs text-white focus:outline-none focus:border-blue-500"
-                    placeholder="michael@example.com"
+                    placeholder="08XXXXXXXX"
                   />
                 </div>
               </div>
 
-              {/* Client Linking */}
-              {currentUser.role === 'client' && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Client Rattaché (Annonceur)
-                  </label>
-                  <div className="relative">
-                    <Building2 className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
-                    <select
-                      value={clientId}
-                      onChange={(e) => setClientId(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-xs text-white focus:outline-none focus:border-blue-500"
-                    >
-                      <option value="">-- Aucun / Tous les accès --</option>
-                      {clients.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 

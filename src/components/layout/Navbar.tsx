@@ -58,14 +58,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
         return { label: 'Super Admin', color: 'bg-purple-500/25 text-purple-300 border-purple-500/40' };
       case 'admin':
         return { label: 'Admin Général', color: 'bg-rose-500/20 text-rose-300 border-rose-500/30' };
-      case 'media_manager':
-        return { label: 'Resp. Média BTL', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' };
-      case 'finance':
-        return { label: 'Resp. Finance BTL', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' };
-      case 'auditor':
-        return { label: 'Auditeur (Lecture)', color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' };
-      case 'client':
-        return { label: 'Utilisateur Client', color: 'bg-sky-500/20 text-sky-300 border-sky-500/30' };
+      case 'sub_admin':
+        return { label: 'Coordinateur', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' };
+      case 'supervisor':
+        return { label: 'Superviseur', color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' };
+      case 'operations':
+        return { label: 'Opérations', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' };
       default:
         return { label: 'Utilisateur', color: 'bg-slate-500/20 text-slate-300 border-slate-500/30' };
     }
@@ -293,7 +291,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenExportModal }) => {
                 <img src={currentUser.avatar} alt={currentUser.name} className="w-10 h-10 rounded-xl object-cover ring-1 ring-blue-400" referrerPolicy="no-referrer" />
                 <div className="overflow-hidden">
                   <div className="font-bold text-white text-xs truncate">{currentUser.name}</div>
-                  <div className="text-[10px] text-slate-400 truncate">{currentUser.email}</div>
+                  <div className="text-[10px] text-slate-400 truncate">{currentUser.phone || 'Téléphone non renseigné'}</div>
                   <span className={`inline-block mt-1 px-1.5 py-0.2 text-[9px] font-bold rounded border ${roleInfo.color}`}>
                     {roleInfo.label}
                   </span>

@@ -30,7 +30,7 @@ export const PricingMatrixView: React.FC = () => {
 
   // Role detection
   const isAdmin = currentUser.role === 'admin' || currentUser.role === 'super-admin';
-  const isClient = currentUser.role === 'client';
+  const isClient = false;
   const isBTL = !isAdmin && !isClient;
 
   // View mode: 'matrix' (Matrice croisée) | 'rows' (Enregistrements par ligne)
