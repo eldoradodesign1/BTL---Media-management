@@ -2,8 +2,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Retrieve credentials from environment variables, defaults, or localStorage for interactive setup
 export const getSupabaseConfig = () => {
-  const DEFAULT_URL = 'https://mpigzdighzzcdccffgyz.supabase.co';
-  const DEFAULT_KEY = 'sb_publishable_61FpNU20NoBPuwKrnXTDxQ_389wVYnz';
+  const DEFAULT_URL = 'https://upkzlppvwckriuidnyvq.supabase.co';
+  const DEFAULT_KEY = 'sb_publishable_36S8t4yZQhYXXMZa3p9ldg_EWnP8gPL';
 
   const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
   const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
